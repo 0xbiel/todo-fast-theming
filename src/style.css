@@ -32,3 +32,5 @@
 
 .visual-design .board button:focus-visible{outline:2px solid var(--text);outline-offset:2px;box-shadow:0 0 0 4px var(--surface)}
 .visual-design .board .task-title{font-size:14px;line-height:1.5}
+
+.visual-design .board .card:has(.popover){z-index:25}

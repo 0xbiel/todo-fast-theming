@@ -92,8 +92,8 @@ export function parseVisualSvg(source){
 export function validateVisualDesign(value){
  const keys=['canvasCss','cardCss','headingCss','titleCss','sceneSvg','cardSvg'];
  if(!value||Array.isArray(value)||Object.keys(value).length!==keys.length||Object.keys(value).some(k=>!keys.includes(k)))throw Error('Invalid visual design');
- const result={};for(const target of ['canvas','card','heading','title'])result[target+'Css']=validateVisualCss(value[target+'Css'],target);
- for(const key of ['sceneSvg','cardSvg']){parseVisualSvg(value[key]);result[key]=value[key]}
+ const result={};for(const target of ['canvas','card','heading','title']){try{result[target+'Css']=validateVisualCss(value[target+'Css'],target)}catch(error){throw Object.assign(error,{validationField:'visual.'+target+'Css'})}}
+ for(const key of ['sceneSvg','cardSvg']){try{parseVisualSvg(value[key]);result[key]=value[key]}catch(error){throw Object.assign(error,{validationField:'visual.'+key})}}
  return result;
 }
 export function VisualSvg({source,className}){

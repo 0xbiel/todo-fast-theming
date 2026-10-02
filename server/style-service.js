@@ -1,11 +1,12 @@
 import {validateStyleRequest,validateTheme,readableTheme} from '../src/theme.js';
 import {decodeProviderTheme,outputValidationCode} from '../src/provider-theme.js';
 import {themeSchema} from '../src/theme-schema.js';
+import {safeVisualCssDiagnostics} from '../src/visual-diagnostics.js';
 import {ProviderError} from './provider-errors.js';
 import {QuotaError} from './errors.js';
 export const MAX_INPUT_TOKENS=4096,MAX_COMPLETION_TOKENS=32768;
 function cost(input,output,rates) {return Math.ceil((input*rates.inputMicrosPerMillion+output*rates.outputMicrosPerMillion)/1000000)}
-export function createStyleService({verifyIdToken,generate,ownerKey,approvedEmails=[],ledger,rates,maxCompletionTokens=MAX_COMPLETION_TOKENS}) {
+export function createStyleService({verifyIdToken,generate,ownerKey,approvedEmails=[],ledger,rates,maxCompletionTokens=MAX_COMPLETION_TOKENS,previewDiagnostics=false}) {
  if(!Number.isSafeInteger(maxCompletionTokens)||maxCompletionTokens<2048||maxCompletionTokens>32768)throw Error('Invalid completion cap');
  if(!ledger) throw Error('Durable ledger required');
  if(!rates||!Object.values(rates).every(v=>Number.isSafeInteger(v)&&v>0)||!rates.inputMicrosPerMillion||!rates.outputMicrosPerMillion)throw Error('Reviewed provider price bounds required');
@@ -51,7 +52,7 @@ export function createStyleService({verifyIdToken,generate,ownerKey,approvedEmai
    if(typeof content!=='string'){diagnostic.stage='content_type';throw Error('Invalid output')}
    if(content.length>262144){diagnostic.stage='content_size';throw Error('Invalid output')}
    diagnostic.stage='theme_validation';
-   let theme;try{theme=validateTheme(readableTheme(decodeProviderTheme(JSON.parse(content))))}catch(error){diagnostic.validation=outputValidationCode(error);if(['visual.canvasCss','visual.cardCss','visual.headingCss','visual.titleCss','visual.sceneSvg','visual.cardSvg'].includes(error?.validationField))diagnostic.field=error.validationField;diagnostic.contentLength=content.length;throw error;}
+   let theme;try{theme=validateTheme(readableTheme(decodeProviderTheme(JSON.parse(content))))}catch(error){diagnostic.validation=outputValidationCode(error);if(previewDiagnostics===true)Object.assign(diagnostic,safeVisualCssDiagnostics(error));if(['visual.canvasCss','visual.cardCss','visual.headingCss','visual.titleCss','visual.sceneSvg','visual.cardSvg'].includes(error?.validationField))diagnostic.field=error.validationField;diagnostic.contentLength=content.length;throw error;}
    // Even a compromised provider cannot echo a secret in a presentation name.
    if([key,ownerKey].filter(Boolean).some(secret=>JSON.stringify(theme).includes(secret))){diagnostic.stage='secret_guard';throw Error('Invalid output')}
    return {status:200,theme};

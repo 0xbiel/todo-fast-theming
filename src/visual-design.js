@@ -1,6 +1,7 @@
 import * as css from 'css-tree';
 import {DOMParser} from '@xmldom/xmldom';
 import React,{useId} from 'react';
+import {visualCssError} from './visual-diagnostics.js';
 
 const cssTargets={
  canvas:new Set(['background-color','background-image','background-size','background-position','background-repeat']),
@@ -15,29 +16,40 @@ function validateFontFamilies(value){
  value.children.forEach(node=>{if(node.type==='Operator'&&node.value===',')families.push([]);else families.at(-1).push(node)});
  for(const family of families){
   const name=family.length===1&&family[0].type==='String'?family[0].value:family.every(node=>node.type==='Identifier')?family.map(node=>node.name).join(' '):'';
-  if(!fonts.has(name.toLowerCase()))throw Error('Invalid visual CSS');
+  if(!fonts.has(name.toLowerCase()))throw visualCssError('font_family','font-family',name);
  }
 }
 export function validateVisualCss(text,target){
- if(typeof text!=='string'||text.length>4000||!cssTargets[target]||/[<>\\@]/.test(text))throw Error('Invalid visual CSS');
- let ast;try{ast=css.parse(text,{context:'declarationList',positions:false})}catch{throw Error('Invalid visual CSS')}
+ if(typeof text!=='string')throw visualCssError('input_type');
+ if(text.length>4000)throw visualCssError('length');
+ if(!cssTargets[target])throw visualCssError('target');
+ if(/[<>\\@]/.test(text))throw visualCssError('forbidden_syntax');
+ let ast;try{ast=css.parse(text,{context:'declarationList',positions:false})}catch{throw visualCssError('parse')}
  let declarations=0,nodes=0;
  ast.children.forEach(decl=>{
-  if(decl.type!=='Declaration'||decl.important||!cssTargets[target].has(decl.property)||++declarations>12)throw Error('Invalid visual CSS');
-  if(css.lexer.matchProperty(decl.property,decl.value).error)throw Error('Invalid visual CSS');
-  if(decl.property==='box-shadow'&&decl.value.children.toArray().filter(n=>n.type==='Operator'&&n.value===',').length>1)throw Error('Invalid visual CSS');
+  const fail=(reason,feature)=>{throw visualCssError(reason,decl.property,feature)};
+  if(decl.type!=='Declaration')fail('node_type',decl.type);
+  if(decl.important)fail('important');
+  if(!cssTargets[target].has(decl.property))fail('property');
+  if(++declarations>12)fail('declaration_limit');
+  if(css.lexer.matchProperty(decl.property,decl.value).error)fail('grammar');
+  if(decl.property==='box-shadow'&&decl.value.children.toArray().filter(n=>n.type==='Operator'&&n.value===',').length>1)fail('shadow_count');
   if(decl.property==='font-family')validateFontFamilies(decl.value);
   let functions=0;
   css.walk(decl.value,n=>{
-   if(++nodes>400||['Url','Raw','Atrule','Rule'].includes(n.type))throw Error('Invalid visual CSS');
-   if(n.type==='Function'&&(!cssFunctions.has(n.name.toLowerCase())||++functions>12))throw Error('Invalid visual CSS');
-   if(['Dimension','Number','Percentage'].includes(n.type)&&(!Number.isFinite(Number(n.value))||Math.abs(Number(n.value))>1000))throw Error('Invalid visual CSS');
-   if(n.type==='Dimension'&&!['px','deg'].includes(n.unit.toLowerCase()))throw Error('Invalid visual CSS');
-   if(['inherit','initial','unset','revert','revert-layer','currentcolor'].includes(n.name?.toLowerCase()))throw Error('Invalid visual CSS');
-   if(decl.property==='box-shadow'&&n.type==='Dimension'&&Math.abs(Number(n.value))>24)throw Error('Invalid visual CSS');
+   if(++nodes>400)fail('complexity');
+   if(['Url','Raw','Atrule','Rule'].includes(n.type))fail('node',n.type);
+   if(n.type==='Function'){
+    if(!cssFunctions.has(n.name.toLowerCase()))fail('function',n.name);
+    if(++functions>12)fail('function_count',n.name);
+   }
+   if(['Dimension','Number','Percentage'].includes(n.type)&&(!Number.isFinite(Number(n.value))||Math.abs(Number(n.value))>1000))fail('number_range',n.type);
+   if(n.type==='Dimension'&&!['px','deg'].includes(n.unit.toLowerCase()))fail('unit',n.unit);
+   if(['inherit','initial','unset','revert','revert-layer','currentcolor'].includes(n.name?.toLowerCase()))fail('global_keyword',n.name);
+   if(decl.property==='box-shadow'&&n.type==='Dimension'&&Math.abs(Number(n.value))>24)fail('shadow_range');
    if(['border-width','border-radius','letter-spacing'].includes(decl.property)&&['Dimension','Number','Percentage'].includes(n.type)){
     const max=decl.property==='border-width'?4:decl.property==='border-radius'?32:2;
-    if(n.type==='Percentage'||Number(n.value)<0||Number(n.value)>max)throw Error('Invalid visual CSS');
+    if(n.type==='Percentage'||Number(n.value)<0||Number(n.value)>max)fail('length_range',n.type);
    }
   });
  });

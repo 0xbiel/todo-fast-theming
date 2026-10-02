@@ -29,7 +29,7 @@ export async function generateMockTheme(prompt, current) {
 }
 
 export function validateStyleRequest(prompt) {
- if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 500 || /[?]|ignore|instructions|javascript|html|api.?key|secret|delete|add task|move task|explain|calculate|who is|what is|write (a|an)|weather/i.test(prompt) || !/random|paper|light|dark|editorial|ocean|blue|teal|pink|rose|minimal|calm|color|colour|style|look|layout|compact|serif|modern|midnight|warm|cool|green|purple|rounded|stack|background|gradient|svg|illustration|geometric|pattern|art|shape/i.test(prompt)) throw new Error('Describe only a visual style, for example calm ocean or editorial paper.');
+ if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 500 || /[?]|ignore|instructions|javascript|html|api.?key|secret|delete|add task|move task|explain|calculate|who is|what is|write (a|an)|weather/i.test(prompt) || !/random|paper|notebook|leather|post[- ]?its?|sticky notes?|light|dark|editorial|ocean|blue|teal|pink|rose|minimal|calm|color|colour|style|look|layout|compact|serif|modern|midnight|warm|cool|green|purple|rounded|stack|background|gradient|svg|illustration|geometric|pattern|art|shape/i.test(prompt)) throw new Error('Describe only a visual style, for example calm ocean or editorial paper.');
  return prompt.trim();
 }
 

@@ -34,3 +34,6 @@
 .visual-design .board .task-title{font-size:14px;line-height:1.5}
 
 .visual-design .board .card:has(.popover){z-index:25}
+
+/* Snapshot metadata and empty states also stay readable over authored paint. */
+.visual-design .card>.task-id,.visual-design .card .task-description,.visual-design .empty-column{background:var(--surface);color:var(--muted);border-radius:3px}

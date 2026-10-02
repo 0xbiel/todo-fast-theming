@@ -1,4 +1,4 @@
-// Provider wire format uses supported numeric/enum constraints, never CSS strings.
+// Provider wire format bounds RGB/enums; visual CSS/SVG strings receive strict downstream validation.
 export const styleNames=['Custom','Ocean','Paper','Midnight','Rose','Editorial','Minimal','Warm','Cool','Geometric','Modern','Calm'];
 export const colorKeys=['background','surface','text','muted','accent','urgentColor'];
 export function decodeProviderTheme(input){

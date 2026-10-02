@@ -7,8 +7,10 @@ import {requestStyle} from './style-client.js';
 import {createStyleDispatcher} from './style-mode.js';
 import {generateMockTheme} from './theme.js';
 const env=import.meta.env;
-export const authEnabled=env.VITE_ENABLE_AUTH==='true'&&!!env.VITE_SUPABASE_URL&&!!env.VITE_SUPABASE_PUBLISHABLE_KEY;
-export const localByokEnabled=env.VITE_ENABLE_LOCAL_BYOK==='true'&&['127.0.0.1','localhost'].includes(location.hostname);
+// Fixture entrypoints never initialize a persistent auth client or live services.
+export const fixtureRuntime=!!document.getElementById('fixture-root');
+export const authEnabled=!fixtureRuntime&&env.VITE_ENABLE_AUTH==='true'&&!!env.VITE_SUPABASE_URL&&!!env.VITE_SUPABASE_PUBLISHABLE_KEY;
+export const localByokEnabled=!fixtureRuntime&&env.VITE_ENABLE_LOCAL_BYOK==='true'&&['127.0.0.1','localhost'].includes(location.hostname);
 export const liveAI=authEnabled&&env.VITE_ENABLE_LIVE_AI==='true';
 export const googleAuthEnabled=authEnabled&&env.VITE_ENABLE_GOOGLE_AUTH==='true';
 export const githubAuthEnabled=authEnabled&&env.VITE_ENABLE_GITHUB_AUTH==='true';
@@ -16,8 +18,9 @@ export const passwordlessMode=['link','code'].includes(env.VITE_PASSWORDLESS_MOD
 const client=authEnabled?createClient(env.VITE_SUPABASE_URL,env.VITE_SUPABASE_PUBLISHABLE_KEY,{auth:{flowType:'pkce',detectSessionInUrl:false}}):null;
 export const authentication=client?createSupabaseAdapter(client,location.origin+location.pathname):null;
 export const completeAuthRedirect=authentication?createAuthBootstrap(authentication,{readUrl:()=>location.href,replaceUrl:url=>history.replaceState(null,'',url)}):async()=>null;
-export const mockEnabled=env.DEV&&env.VITE_ENABLE_MOCK==='true';
+export const mockEnabled=!fixtureRuntime&&env.DEV&&env.VITE_ENABLE_MOCK==='true';
 export const generateStyle=createStyleDispatcher({localByokEnabled,liveAI,mockEnabled,local:prompt=>requestLocalStyle({prompt,byok:localStorage.getItem('board-studio.byok')||undefined}),live:async prompt=>{await completeAuthRedirect();return requestStyle({prompt,getIdToken:authentication.token,refreshAuth:authentication.refresh,byok:localStorage.getItem('board-studio.byok')||undefined})},mock:generateMockTheme});
 
-export const hostedSharing=env.VITE_ENABLE_PUBLIC_SHARING==='true';
+export const hostedSharing=!fixtureRuntime&&env.VITE_ENABLE_PUBLIC_SHARING==='true';
 export const hostedSnapshots=createHostedSnapshotClient(()=>authentication?.token());
+

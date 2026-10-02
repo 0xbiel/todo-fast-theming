@@ -1,10 +1,11 @@
+import {safeCssRepairs} from './visual-diagnostics.js';
 import {safeStyleWarnings} from './style-warnings.js';
 import {validateStyleRequest,validateTheme} from './theme.js';
 import {UiError,responseError} from './ui-errors.js';
 export function createStyleRequester(){
  // One refresh per consecutive authentication failure, never a paid POST retry.
  let refreshAttempted=false;
- return async function requestStyle({prompt,getIdToken,refreshAuth,byok,onWarnings,fetchImpl=fetch}) {
+ return async function requestStyle({prompt,getIdToken,refreshAuth,byok,onWarnings,onCssRepairs,fetchImpl=fetch}) {
   let request,token;
   try{request=validateStyleRequest(prompt)}catch{throw new UiError('scope')}
   try{token=await getIdToken()}catch{throw new UiError('auth')}
@@ -27,7 +28,7 @@ export function createStyleRequester(){
    throw responseError(response.status,data?.code,data?.diagnostic);
   }
   refreshAttempted=false;
-  try{const data=await response.json();const theme=validateTheme(data.theme);onWarnings?.(safeStyleWarnings(data.warnings));return theme}catch{throw new UiError('output',{stage:'client_validation'})}
+  try{const data=await response.json();const theme=validateTheme(data.theme);onWarnings?.(safeStyleWarnings(data.warnings));onCssRepairs?.(safeCssRepairs(data.cssRepairs));return theme}catch{throw new UiError('output',{stage:'client_validation'})}
  };
 }
 export const requestStyle=createStyleRequester();

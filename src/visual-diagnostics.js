@@ -1,6 +1,6 @@
 // All transmitted details are fixed vocabulary, never provider-authored values.
 export const visualCssDiagnostics={
- cssReason:['input_type','length','target','forbidden_syntax','parse','node_type','important','property','declaration_limit','grammar','shadow_count','font_family','complexity','node','function','function_count','number_range','unit','global_keyword','shadow_range','length_range'],
+ cssReason:['shorthand','input_type','length','target','forbidden_syntax','parse','node_type','important','property','declaration_limit','grammar','shadow_count','font_family','complexity','node','function','function_count','number_range','unit','global_keyword','shadow_range','length_range'],
  cssProperty:['other','background','background-color','background-image','background-size','background-position','background-repeat','background-blend-mode','background-attachment','background-origin','background-clip','border','border-color','border-style','border-width','border-radius','border-top','border-bottom','box-shadow','color','font','font-family','font-size','font-weight','font-style','line-height','letter-spacing','text-transform','text-shadow','padding','margin','width','height','min-height','opacity','display','position','transform','filter','animation','transition','pointer-events','z-index','mix-blend-mode','box-sizing'],
  cssFeature:['other','url','raw','atrule','rule','var','calc','min','max','clamp','color-mix','light-dark','image-set','rgb','rgba','hsl','hsla','linear-gradient','radial-gradient','conic-gradient','repeating-linear-gradient','repeating-radial-gradient','repeating-conic-gradient','px','deg','em','rem','vh','vw','vmin','vmax','ch','ex','cm','mm','in','pt','pc','turn','rad','grad','inherit','initial','unset','revert','revert-layer','currentcolor','inter','georgia','times new roman','palatino','garamond','arial','helvetica','verdana','trebuchet ms','courier new','system-ui','serif','sans-serif','monospace','cursive','percentage','dimension','number']
 };
@@ -10,4 +10,18 @@ export function safeVisualCssDiagnostics(value){
 export function visualCssError(reason,property,feature){
  const known=(key,value)=>visualCssDiagnostics[key].includes(value)?value:'other';
  return Object.assign(Error('Invalid visual CSS'),{cssReason:reason,...(property?{cssProperty:known('cssProperty',property.toLowerCase())}:{}),...(feature?{cssFeature:known('cssFeature',feature.toLowerCase())}:{})});
+}
+export function safeCssRepairs(value){
+ if(!Array.isArray(value))return [];
+ const result=[];
+ for(const item of value){
+  if(!['canvas','card','heading','title'].includes(item?.target)||!['dropped','clamped','normalized'].includes(item?.action))continue;
+  const detail=safeVisualCssDiagnostics(item);if(!detail.cssReason||!detail.cssProperty)continue;
+  const entry={target:item.target,action:item.action,...detail};if(!result.some(previous=>JSON.stringify(previous)===JSON.stringify(entry)))result.push(entry);if(result.length===8)break;
+ }
+ return result;
+}
+export function cssRepairMessage(value){
+ const repairs=safeCssRepairs(value);if(!repairs.length)return '';
+ return ' Preview CSS: '+repairs.slice(0,4).map(item=>item.action+' '+item.target+' '+item.cssProperty+' ('+item.cssReason+(item.cssFeature&&item.cssFeature!=='other'?': '+item.cssFeature:'')+')').join('; ')+'.';
 }

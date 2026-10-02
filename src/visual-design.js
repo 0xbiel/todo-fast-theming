@@ -1,7 +1,7 @@
 import * as css from 'css-tree';
 import {DOMParser} from '@xmldom/xmldom';
 import React,{useId} from 'react';
-import {visualCssError} from './visual-diagnostics.js';
+import {visualCssError,safeVisualCssDiagnostics} from './visual-diagnostics.js';
 
 const cssTargets={
  canvas:new Set(['background-color','background-image','background-size','background-position','background-repeat']),
@@ -60,7 +60,21 @@ export function validateVisualCss(text,target){
 // Never repair network/dynamic features, executable syntax or layout/control CSS.
 const cosmeticProperties=new Set([...Object.values(cssTargets).flatMap(values=>[...values]),'background','background-attachment','background-origin','background-clip','background-blend-mode','border','font','font-size','font-variant','line-height','color','text-shadow','text-decoration','text-align']);
 const repairableReasons=new Set(['important','grammar','shadow_count','font_family','complexity','function_count','number_range','unit','global_keyword','shadow_range','length_range','declaration_limit']);
-export function repairVisualCss(text,target){
+function expandBackground(value){
+ const matched=css.lexer.matchProperty('background',value);if(matched.error)return null;
+ const layers=[{image:[],position:[],size:[],repeat:[]}],color=[];let recognized=false;
+ value.children.forEach(node=>{
+  if(node.type==='Operator'&&node.value===','){layers.push({image:[],position:[],size:[],repeat:[]});return}
+  const trace=matched.getTrace(node)||[],has=name=>trace.some(part=>part.name===name),layer=layers.at(-1);
+  const key=has('bg-image')?'image':has('bg-position')?'position':has('bg-size')?'size':has('repeat-style')?'repeat':null;
+  if(key){layer[key].push(css.generate(node));recognized=true}else if(has('background-color')){color.push(css.generate(node));recognized=true}
+ });
+ if(!recognized)return null;
+ const entries=[['background-color',color.join(' ')||'transparent']];
+ for(const [key,initial] of [['image','none'],['position','0% 0%'],['size','auto'],['repeat','repeat']])entries.push(['background-'+key,layers.map(layer=>layer[key].join(' ')||initial).join(',')]);
+ return css.parse(entries.map(([property,value])=>property+':'+value).join(';'),{context:'declarationList',positions:false}).children.toArray();
+}
+export function repairVisualCss(text,target,onRepair){
  if(typeof text!=='string'||text.length>4000||!cssTargets[target]||/[<>\\@]/.test(text))return validateVisualCss(text,target);
  let ast;try{ast=css.parse(text,{context:'declarationList',positions:false})}catch{throw visualCssError('parse')}
  // Inspect the complete input before dropping any declaration, including overflow.
@@ -72,36 +86,43 @@ export function repairVisualCss(text,target){
    if(node.type==='Function'&&!cssFunctions.has(node.name.toLowerCase()))throw visualCssError('function',decl.property,node.name);
   });
  });
- let result='';
+ const declarations=[];
  ast.children.forEach(decl=>{
+  const expanded=decl.property.toLowerCase()==='background'&&['canvas','card'].includes(target)?expandBackground(decl.value):null;
+  if(expanded){onRepair?.({target,action:'normalized',cssReason:'shorthand',cssProperty:'background'});declarations.push(...expanded)}else declarations.push(decl);
+ });
+ let result='';
+ declarations.forEach(decl=>{
   decl.property=decl.property.toLowerCase();
-  if(!cssTargets[target].has(decl.property))return;
+  const report=(action,error)=>onRepair?.({target,action,...safeVisualCssDiagnostics(error)});
+  if(!cssTargets[target].has(decl.property)){report('dropped',visualCssError('property',decl.property));return}
+  let detail=decl.important?visualCssError('important',decl.property):null;
   decl.important=false;
   let discard=false;
   css.walk(decl.value,node=>{
    if(!['Dimension','Number','Percentage'].includes(node.type))return;
    const number=Number(node.value);
-   if(!Number.isFinite(number)||node.type==='Dimension'&&!['px','deg'].includes(node.unit.toLowerCase())){discard=true;return}
+   if(!Number.isFinite(number)||node.type==='Dimension'&&!['px','deg'].includes(node.unit.toLowerCase())){discard=true;detail=visualCssError(Number.isFinite(number)?'unit':'number_range',decl.property,node.unit||node.type);return}
    let min=-1000,max=1000;
    if(['border-width','border-radius','letter-spacing'].includes(decl.property)){
-    if(node.type==='Percentage'){discard=true;return}
+    if(node.type==='Percentage'){discard=true;detail=visualCssError('length_range',decl.property,node.type);return}
     min=0;max=decl.property==='border-width'?4:decl.property==='border-radius'?32:2;
    }else if(decl.property==='box-shadow'&&node.type==='Dimension'){min=-24;max=24;}
-   const bounded=Math.max(min,Math.min(max,number));if(bounded!==number)node.value=String(bounded);
+   const bounded=Math.max(min,Math.min(max,number));if(bounded!==number){node.value=String(bounded);detail=visualCssError(['border-width','border-radius','letter-spacing'].includes(decl.property)?'length_range':decl.property==='box-shadow'?'shadow_range':'number_range',decl.property,node.type);}
   });
-  if(discard)return;
+  if(discard){report('dropped',detail);return;}
   const candidate=result+css.generate(decl)+';';
-  try{result=validateVisualCss(candidate,target)+';'}catch(error){if(!repairableReasons.has(error.cssReason))throw error;}
+  try{result=validateVisualCss(candidate,target)+';';if(detail)report(detail.cssReason==='important'?'normalized':'clamped',detail)}catch(error){if(!repairableReasons.has(error.cssReason))throw error;report('dropped',error);}
  });
  return validateVisualCss(result,target);
 }
-export function repairVisualTheme(input,{warnings}={}){
+export function repairVisualTheme(input,{warnings,cssRepairs}={}){
  if(input?.visual===undefined)return input;
  const visual=input.visual,keys=['canvasCss','cardCss','headingCss','titleCss','sceneSvg','cardSvg'];
  if(!visual||Array.isArray(visual)||Object.keys(visual).length!==keys.length||Object.keys(visual).some(key=>!keys.includes(key)))throw Error('Invalid visual design');
  const result={...visual};
  for(const target of ['canvas','card','heading','title']){
-  try{result[target+'Css']=repairVisualCss(visual[target+'Css'],target)}catch(error){throw Object.assign(error,{validationField:'visual.'+target+'Css'})}
+  try{result[target+'Css']=repairVisualCss(visual[target+'Css'],target,Array.isArray(cssRepairs)?value=>cssRepairs.push(value):undefined)}catch(error){throw Object.assign(error,{validationField:'visual.'+target+'Css'})}
  }
  // Decorations are optional. Never render or return a rejected SVG string.
  for(const key of ['sceneSvg','cardSvg']){

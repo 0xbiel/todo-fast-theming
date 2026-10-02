@@ -14,7 +14,7 @@ test('cosmetic repair clamps bounded lengths and revalidates the resulting decla
  for(const theme of Object.values(visualFixtures))for(const target of ['canvas','card','heading','title'])assert.equal(repairVisualCss(theme.visual[target+'Css'],target),validateVisualCss(theme.visual[target+'Css'],target));
 });
 test('benign unsupported paint, font and grammar declarations fall back without discarding valid paint',()=>{
- assert.equal(repairVisualCss('background-attachment:fixed;background:#ffffff;background-color:#faf8f0;background-size:2rem 2rem','canvas'),'background-color:#faf8f0');
+ const paint=repairVisualCss('background-attachment:fixed;background:#ffffff;background-color:#faf8f0;background-size:2rem 2rem','canvas');assert.match(paint,/background-color:#faf8f0/);assert.doesNotMatch(paint,/attachment|2rem/);assert.equal(validateVisualCss(paint,'canvas'),paint);
  assert.equal(repairVisualCss('background-size:potato;background-color:#faf8f0','canvas'),'background-color:#faf8f0');
  assert.equal(repairVisualCss('font-family:Inter,sans-serif;letter-spacing:1px','title'),'letter-spacing:1px');
  assert.equal(repairVisualCss('border-radius:50%;border-color:#ffffff','card'),'border-color:#ffffff');

@@ -19,7 +19,7 @@ const client=authEnabled?createClient(env.VITE_SUPABASE_URL,env.VITE_SUPABASE_PU
 export const authentication=client?createSupabaseAdapter(client,location.origin+location.pathname):null;
 export const completeAuthRedirect=authentication?createAuthBootstrap(authentication,{readUrl:()=>location.href,replaceUrl:url=>history.replaceState(null,'',url)}):async()=>null;
 export const mockEnabled=!fixtureRuntime&&env.DEV&&env.VITE_ENABLE_MOCK==='true';
-export const generateStyle=createStyleDispatcher({localByokEnabled,liveAI,mockEnabled,local:(prompt,_current,options)=>requestLocalStyle({prompt,onWarnings:options?.onWarnings,byok:localStorage.getItem('board-studio.byok')||undefined}),live:async (prompt,_current,options)=>{await completeAuthRedirect();return requestStyle({prompt,onWarnings:options?.onWarnings,getIdToken:authentication.token,refreshAuth:authentication.refresh,byok:localStorage.getItem('board-studio.byok')||undefined})},mock:generateMockTheme});
+export const generateStyle=createStyleDispatcher({localByokEnabled,liveAI,mockEnabled,local:(prompt,_current,options)=>requestLocalStyle({prompt,onWarnings:options?.onWarnings,byok:localStorage.getItem('board-studio.byok')||undefined}),live:async (prompt,_current,options)=>{await completeAuthRedirect();return requestStyle({prompt,onWarnings:options?.onWarnings,onCssRepairs:options?.onCssRepairs,getIdToken:authentication.token,refreshAuth:authentication.refresh,byok:localStorage.getItem('board-studio.byok')||undefined})},mock:generateMockTheme});
 
 export const hostedSharing=!fixtureRuntime&&env.VITE_ENABLE_PUBLIC_SHARING==='true';
 export const hostedSnapshots=createHostedSnapshotClient(()=>authentication?.token());

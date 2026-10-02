@@ -1,0 +1,5 @@
+import {validateTheme} from './theme.js';
+// Trusted host storage only. Do not pass this to a renderer, snapshots, or Supabase.
+export const browserKeyStore={save(key){localStorage.setItem('board-studio.byok',key)},clear(){localStorage.removeItem('board-studio.byok')},has(){return !!localStorage.getItem('board-studio.byok')}};
+export function makeSnapshot(tasks,theme){return {version:1,theme:validateTheme(theme),tasks:tasks.map(t=>({id:String(t.id),title:String(t.title).slice(0,200),status:t.status,description:String(t.description||'').slice(0,2000),priority:['Low','Medium','High','Urgent'].includes(t.priority)?t.priority:'Medium',label:String(t.label||'Task').slice(0,40)}))}}
+export const localSnapshotStore={publish(snapshot,existingId){const id=existingId||crypto.randomUUID();localStorage.setItem('board-studio.snapshot.'+id,JSON.stringify(snapshot));return id},read(id){try{const raw=JSON.parse(localStorage.getItem('board-studio.snapshot.'+id));return raw?.version===1&&Array.isArray(raw.tasks)?makeSnapshot(raw.tasks,raw.theme):null}catch{return null}},revoke(id){localStorage.removeItem('board-studio.snapshot.'+id)}};

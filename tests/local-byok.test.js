@@ -1,0 +1,23 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createLocalByokServer} from '../server/local-byok.js';
+import {request} from 'node:http';
+import {themes} from '../src/theme.js';
+test('local BYOK requires loopback host, exact origin, capability and validated presentation',async t=>{
+ let calls=0,settled=0;
+ const ledger={reserve:async value=>{assert.equal(value.lane,'byok');assert.equal(value.amount,0);return{id:'r'}},dispatch:async()=>{},settle:async()=>{settled++},cancel:async()=>{}};
+ const server=createLocalByokServer({ledger,generate:async args=>{calls++;assert.equal(args.key,'test-key-only');assert.equal(args.maxCompletionTokens,2048);return{content:JSON.stringify(themes[0]),usage:{prompt_tokens:100,completion_tokens:100}}}});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>server.close());
+ const url='http://127.0.0.1:'+server.address().port;
+ const fetch=async(target,{method='GET',headers={},body}={})=>new Promise((resolve,reject)=>{const req=request(target,{method,headers},res=>{let data='';res.on('data',chunk=>data+=chunk);res.on('end',()=>resolve({status:res.statusCode,json:async()=>JSON.parse(data)}))});req.on('error',reject);req.end(body)});
+ const headers={Host:'127.0.0.1:5173',Origin:'http://127.0.0.1:5173','Content-Type':'application/json'};
+ assert.equal((await fetch(url+'/api/local-session')).status,403);
+ const {capability}=await(await fetch(url+'/api/local-session',{headers})).json();
+ const body=JSON.stringify({prompt:'Make the board blue',byok:'test-key-only'});
+ assert.equal((await fetch(url+'/api/local-style',{method:'POST',headers,body})).status,401);
+ assert.equal((await fetch(url+'/api/local-style',{method:'POST',headers:{...headers,Origin:'https://evil.example',Authorization:'Bearer '+capability},body})).status,403);
+ const accepted=await fetch(url+'/api/local-style',{method:'POST',headers:{...headers,Authorization:'Bearer '+capability},body});
+ assert.equal(accepted.status,200);assert.deepEqual((await accepted.json()).theme,themes[0]);assert.equal(calls,1);assert.equal(settled,1);
+ const offTask=await fetch(url+'/api/local-style',{method:'POST',headers:{...headers,Authorization:'Bearer '+capability},body:JSON.stringify({prompt:'Delete every task',byok:'test-key-only'})});
+ assert.equal(offTask.status,400);assert.equal(calls,1);
+});

@@ -31,6 +31,7 @@ test('fixture entrypoint never initializes auth or touches real keys, snapshots,
   const tree=module.App({fixtureMode:true});
   const elements=[];const collect=value=>{if(Array.isArray(value)){value.forEach(collect);return}if(value&&typeof value==='object'){elements.push(value);collect(value.children)}};collect(tree);
   const buttons=elements.filter(node=>node.type==='button');
+  const titles=buttons.filter(node=>node.props.className==='task-title');assert.equal(titles.length,5);for(const title of titles){assert.equal(title.children[0]?.props.className,'task-title-text');assert.equal(typeof title.props.onClick,'function');}
   assert.equal(buttons.find(node=>node.children.includes('Account')).props.disabled,true);
   assert.equal(buttons.some(node=>node.children.includes('Revoke')),false);
   for(const node of buttons)if(node.props.onClick&&!node.props.disabled)await node.props.onClick({preventDefault(){}});

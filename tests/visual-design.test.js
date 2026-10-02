@@ -50,3 +50,14 @@ test('snapshot metadata and empty-column hints retain protected contrasting text
   assert.equal(declarations?.background,'var(--surface)');assert.equal(declarations?.color,'var(--muted)');
  }
 });
+function trustedDeclarations(selector){
+ const result={};const ast=css.parse(readFileSync(new URL('../src/style.css',import.meta.url),'utf8'));
+ css.walk(ast,node=>{if(node.type==='Rule'&&node.prelude?.type==='SelectorList'&&node.prelude.children.toArray().some(value=>css.generate(value)===selector))for(const decl of node.block.children.toArray())if(decl.type==='Declaration')result[decl.property]=css.generate(decl.value)});return result;
+}
+test('card material remains visible through title and metadata containers',()=>{
+ for(const selector of ['.visual-design .card .task-top','.visual-design .card .card-bottom','.visual-design .card h3'])assert.equal(trustedDeclarations(selector).background,'transparent');
+});
+test('wrapped titles and every card control retain opaque validated text backing',()=>{
+ const title=trustedDeclarations('.visual-design .card .task-title-text');assert.equal(title.background,'var(--surface)');assert.equal(title.color,'var(--text)');assert.equal(title['box-decoration-break'],'clone');assert.equal(title['-webkit-box-decoration-break'],'clone');
+ for(const selector of ['.visual-design .card .task-id','.visual-design .card .card-actions button','.visual-design .card .priority-indicator','.visual-design .card .tag','.visual-design .card .description-mark'])assert.equal(trustedDeclarations(selector).background,'var(--surface)');
+});

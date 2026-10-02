@@ -21,8 +21,11 @@
 .visual-scene{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .visual-design .board .card{position:relative;isolation:isolate}
 .visual-card-art{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:-1;overflow:hidden}
-.visual-design .card .task-top,.visual-design .card .card-bottom,.visual-design .card h3{background:var(--surface);border-radius:3px;color:var(--text)}
-.visual-design .card h3{padding:3px 5px;margin-left:-3px;margin-right:-3px}
+.visual-design .card .task-top,.visual-design .card .card-bottom,.visual-design .card h3{background:transparent;color:var(--text)}
+.visual-design .card h3{padding:3px 0;margin-left:0;margin-right:0}
+/* Back only the readable labels, leaving material visible between and around them. */
+.visual-design .card .task-title-text{background:var(--surface);color:var(--text);padding:1px 3px;border-radius:2px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.visual-design .card .task-id,.visual-design .card .card-actions button,.visual-design .card .priority-indicator,.visual-design .card .tag,.visual-design .card .description-mark{background:var(--surface)}
 .visual-design .heading,.visual-design .toolbar,.visual-design .board .column>h2,.visual-design .board-footer{background:var(--surface);border-radius:6px;padding:8px 10px;color:var(--text)}
 .visual-design .primary{color:var(--surface);background:var(--accent)}
 .visual-design .feedback{display:table;max-width:100%;margin:0 auto 12px;padding:5px 12px;border-radius:12px;color:#f5f5fa;background:#242631;text-shadow:none}

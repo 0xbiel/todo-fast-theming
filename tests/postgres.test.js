@@ -45,3 +45,25 @@ test('reviewed lane migration gives shared 20 without expanding BYOK and keeps c
  // No policy or credential values are published through the public/browser role.
  await db.exec('SET ROLE authenticated');await assert.rejects(command({op:'policy'}),/permission denied/);
 });
+
+test('request-count switch preserves history, spend, approval, concurrency and browser isolation',async t=>{
+ const db=new PGlite();t.after(()=>db.close());await db.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;');
+ for(const file of ['202610020001_board_private.sql','202610020002_lane_limits.sql','202610020003_request_limit_switch.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
+ await db.exec("UPDATE board_private.policy SET enabled=true,per_minute=1,user_daily=1,global_daily=1,shared_user_daily=1,shared_global_daily=1,budget_micros=5000000,approved_emails=ARRAY['owner@example.com'];");
+ const command=async data=>(await db.query('SELECT public.board_command($1::jsonb) AS result',[JSON.stringify(data)])).rows[0].result;
+ const uid='a'.repeat(64),reserve=(lane,email='owner@example.com',amount=lane==='shared'?52880:0)=>command({op:'reserve',id:randomUUID(),uid,lane,email,amount});
+ async function finish(r,actualMicros=0){await command({op:'dispatch',id:r.id});await command({op:'settle',id:r.id,actualMicros});}
+ await finish(await reserve('byok'));await assert.rejects(reserve('byok'),/Quota reached/);
+ await db.exec('UPDATE board_private.policy SET request_limits_enabled=false');
+ for(let i=0;i<25;i++){await finish(await reserve('byok'));await finish(await reserve('shared'),100);}
+ assert.equal((await command({op:'policy'})).maxCompletionTokens,32768);
+ assert.equal((await db.query('SELECT count(*) AS n FROM board_private.reservations')).rows[0].n,51);
+ await assert.rejects(reserve('shared','unapproved@example.com'),/Approval required/);
+ const active=await reserve('byok');await assert.rejects(reserve('byok'),/Quota reached/);await command({op:'cancel',id:active.id});
+ await assert.rejects(reserve('shared','owner@example.com',7107),/Policy changed/);
+ await db.exec('UPDATE board_private.policy SET budget_micros=2500');await assert.rejects(reserve('shared'),/Budget reached/);
+ await db.exec('UPDATE board_private.policy SET request_limits_enabled=true');await assert.rejects(reserve('byok'),/Quota reached/);
+ await db.exec('UPDATE board_private.policy SET request_limits_enabled=false,breaker=true');await assert.rejects(reserve('byok'),/Quota unavailable/);
+ await db.exec('SET ROLE authenticated');await assert.rejects(command({op:'policy'}),/permission denied/);await assert.rejects(db.query('SELECT * FROM board_private.policy'),/permission denied/);
+ await db.exec('RESET ROLE; SET ROLE service_role');await assert.rejects(db.query('SELECT * FROM board_private.policy'),/permission denied/);
+});

@@ -31,3 +31,15 @@ export function validateStyleRequest(prompt) {
 }
 
 export function contrast(a,b){const luminance=hex=>{const rgb=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255).map(c=>c<=.04045?c/12.92:((c+.055)/1.055)**2.4);return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722};const x=luminance(a),y=luminance(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05)}
+
+// Repair color contrast with trusted, bounded color choices before strict validation.
+// Executable fields, SVG geometry, schema and complexity limits are never repaired.
+export function readableTheme(input){
+ const hex=value=>typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value);
+ if(!input||Array.isArray(input)||!hex(input.surface)||!hex(input.text))return input;
+ const theme={...input};
+ if(contrast(theme.text,theme.surface)<4.5)theme.text=contrast('#000000',theme.surface)>contrast('#ffffff',theme.surface)?'#000000':'#ffffff';
+ if(hex(theme.urgentColor)&&contrast(theme.urgentColor,theme.surface)<4.5)theme.urgentColor=hex(theme.accent)&&contrast(theme.accent,theme.surface)>=4.5?theme.accent:theme.text;
+ if(theme.art&&typeof theme.art==='object'&&!Array.isArray(theme.art)){theme.art={...theme.art};for(const key of ['start','end'])if(hex(theme.art[key])&&contrast(theme.text,theme.art[key])<4.5)theme.art[key]=hex(theme.background)&&contrast(theme.text,theme.background)>=4.5?theme.background:theme.surface;}
+ return theme;
+}

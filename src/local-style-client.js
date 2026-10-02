@@ -1,3 +1,4 @@
+import {UiError,responseError} from './ui-errors.js';
 import {validateStyleRequest,validateTheme} from './theme.js';
 export async function requestLocalStyle({prompt,byok,fetchImpl=fetch}) {
  const request=validateStyleRequest(prompt);
@@ -5,7 +6,7 @@ export async function requestLocalStyle({prompt,byok,fetchImpl=fetch}) {
  const session=await fetchImpl('/api/local-session',{cache:'no-store',credentials:'omit'});
  if(!session.ok)throw Error('Local backend unavailable.');
  const {capability}=await session.json();
- const response=await fetchImpl('/api/local-style',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${capability}`},body:JSON.stringify({prompt:request,byok}),signal:AbortSignal.timeout(15000),cache:'no-store',credentials:'omit'});
- if(!response.ok)throw Error(response.status===429?'Local daily request limit reached.':'Cerebras request failed. Check your key and account access.');
+ const response=await fetchImpl('/api/local-style',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${capability}`},body:JSON.stringify({prompt:request,byok}),signal:AbortSignal.timeout(90000),cache:'no-store',credentials:'omit'});
+ if(!response.ok){let code;try{code=(await response.json()).code}catch{}throw responseError(response.status,code)}
  return validateTheme((await response.json()).theme);
 }

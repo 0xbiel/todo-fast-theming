@@ -25,7 +25,7 @@ test('server verifies identity, enforces entitlements, strips output and accepts
 });
 test('malformed provider output never reaches client',async()=>{
  const service=createStyleService({verifyIdToken:async()=>({uid:'u',email:'a@b.com',email_verified:true}),approvedEmails:['a@b.com'],ownerKey:'fake',generate:async()=>'{"script":"bad"}'});
- const result=await service({token:'valid',prompt:'paper'});assert.equal(result.status,400);assert.equal(JSON.stringify(result).includes('script'),false);
+ const result=await service({token:'valid',prompt:'paper'});assert.equal(result.status,502);assert.equal(result.code,'output');assert.equal(JSON.stringify(result).includes('script'),false);
 });
 test('adapter discards reasoning and refuses incomplete output',async()=>{
  const adapter=createCerebrasAdapter(async()=>new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify(themes[1]),reasoning:'private'}}]})));
@@ -36,7 +36,7 @@ test('provider request uses strict presentation schema and bounded parsed reason
  let request;
  const adapter=createCerebrasAdapter(async(_url,options)=>{request=JSON.parse(options.body);return new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify(themes[0])}}]}))});
  await adapter({key:'mock-only',prompt:'paper',maxCompletionTokens:512});
- assert.equal(request.reasoning_effort,'medium');assert.equal(request.max_completion_tokens,512);
+ assert.equal(request.reasoning_effort,'low');assert.equal(request.max_completion_tokens,512);
  assert.equal(request.response_format.json_schema.strict,true);
  const schema=request.response_format.json_schema.schema;
  assert.equal(schema.additionalProperties,false);assert.equal(schema.properties.radius.maximum,24);

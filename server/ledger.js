@@ -7,9 +7,9 @@ import {QuotaError} from './errors.js';
 export {QuotaError} from './errors.js';
 export function createDurableLedger({path,clock=Date.now,limits={}}) {
  if(!isAbsolute(path)) throw Error('Absolute durable database path required');
- const settings={perMinute:5,perUserDaily:30,globalDaily:100,maxConcurrent:2,globalBudgetMicros:0,leaseMs:60000,...limits};
+ const settings={perMinute:5,perUserDaily:30,globalDaily:100,maxConcurrent:2,globalBudgetMicros:0,leaseMs:120000,...limits};
  for(const value of Object.values(settings)) if(!Number.isSafeInteger(value)||value<0) throw Error('Invalid limit');
- if(settings.leaseMs<60000) throw Error('Lease must exceed request timeout');
+ if(settings.leaseMs<120000) throw Error('Lease must exceed request timeout');
  async function command(data) {
   await mkdir(dirname(path),{recursive:true,mode:0o700});
   return new Promise((resolve,reject)=>{

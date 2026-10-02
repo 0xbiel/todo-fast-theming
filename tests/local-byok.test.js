@@ -6,7 +6,7 @@ import {themes} from '../src/theme.js';
 test('local BYOK requires loopback host, exact origin, capability and validated presentation',async t=>{
  let calls=0,settled=0;
  const ledger={reserve:async value=>{assert.equal(value.lane,'byok');assert.equal(value.amount,0);return{id:'r'}},dispatch:async()=>{},settle:async()=>{settled++},cancel:async()=>{}};
- const server=createLocalByokServer({ledger,generate:async args=>{calls++;assert.equal(args.key,'test-key-only');assert.equal(args.maxCompletionTokens,2048);return{content:JSON.stringify(themes[0]),usage:{prompt_tokens:100,completion_tokens:100}}}});
+ const server=createLocalByokServer({ledger,generate:async args=>{calls++;assert.equal(args.key,'test-key-only');assert.equal(args.maxCompletionTokens,32768);return{content:JSON.stringify(themes[0]),usage:{prompt_tokens:100,completion_tokens:100}}}});
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>server.close());
  const url='http://127.0.0.1:'+server.address().port;
  const fetch=async(target,{method='GET',headers={},body}={})=>new Promise((resolve,reject)=>{const req=request(target,{method,headers},res=>{let data='';res.on('data',chunk=>data+=chunk);res.on('end',()=>resolve({status:res.statusCode,json:async()=>JSON.parse(data)}))});req.on('error',reject);req.end(body)});

@@ -1,3 +1,4 @@
+import {createAuthBootstrap} from './auth-bootstrap.js';
 import {createClient} from '@supabase/supabase-js';
 import {createHostedSnapshotClient} from './hosted-snapshots.js';
 import {createSupabaseAdapter} from './supabase-adapter.js';
@@ -14,13 +15,9 @@ export const githubAuthEnabled=authEnabled&&env.VITE_ENABLE_GITHUB_AUTH==='true'
 export const passwordlessMode=['link','code'].includes(env.VITE_PASSWORDLESS_MODE)?env.VITE_PASSWORDLESS_MODE:null;
 const client=authEnabled?createClient(env.VITE_SUPABASE_URL,env.VITE_SUPABASE_PUBLISHABLE_KEY,{auth:{flowType:'pkce',detectSessionInUrl:false}}):null;
 export const authentication=client?createSupabaseAdapter(client,location.origin+location.pathname):null;
-export async function completeAuthRedirect(){
- if(!authentication)return;
- const url=new URL(location.href),code=url.searchParams.get('code');
- if(code){try{await authentication.exchangeCode(code)}finally{url.searchParams.delete('code');history.replaceState(null,'',url.pathname+url.search+url.hash)}}
-}
+export const completeAuthRedirect=authentication?createAuthBootstrap(authentication,{readUrl:()=>location.href,replaceUrl:url=>history.replaceState(null,'',url)}):async()=>null;
 export const mockEnabled=env.DEV&&env.VITE_ENABLE_MOCK==='true';
-export const generateStyle=createStyleDispatcher({localByokEnabled,liveAI,mockEnabled,local:prompt=>requestLocalStyle({prompt,byok:localStorage.getItem('board-studio.byok')||undefined}),live:prompt=>requestStyle({prompt,getIdToken:authentication.token,byok:localStorage.getItem('board-studio.byok')||undefined}),mock:generateMockTheme});
+export const generateStyle=createStyleDispatcher({localByokEnabled,liveAI,mockEnabled,local:prompt=>requestLocalStyle({prompt,byok:localStorage.getItem('board-studio.byok')||undefined}),live:async prompt=>{await completeAuthRedirect();return requestStyle({prompt,getIdToken:authentication.token,refreshAuth:authentication.refresh,byok:localStorage.getItem('board-studio.byok')||undefined})},mock:generateMockTheme});
 
 export const hostedSharing=env.VITE_ENABLE_PUBLIC_SHARING==='true';
 export const hostedSnapshots=createHostedSnapshotClient(()=>authentication?.token());

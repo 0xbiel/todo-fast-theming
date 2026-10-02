@@ -7,7 +7,7 @@ import {createStyleService,createCerebrasAdapter} from '../server/style-service.
 import {createApiServer} from '../server/http.js';
 import {supabaseVerifier} from '../server/auth.js';
 import {themes} from '../src/theme.js';
-async function setup(t,limits={}){const dir=await mkdtemp(join(tmpdir(),'board-security-'));t.after(()=>rm(dir,{recursive:true,force:true}));const path=join(dir,'ledger.sqlite');let now=Date.now();const options={path,clock:()=>now,limits:{globalBudgetMicros:10000,maxConcurrent:2,...limits}};return {ledger:createDurableLedger(options),restart:()=>createDurableLedger(options),path,advance:ms=>now+=ms}}
+async function setup(t,limits={}){const dir=await mkdtemp(join(tmpdir(),'board-security-'));t.after(()=>rm(dir,{recursive:true,force:true}));const path=join(dir,'ledger.sqlite');let now=Date.now();const options={path,clock:()=>now,limits:{globalBudgetMicros:100000,maxConcurrent:2,...limits}};return {ledger:createDurableLedger(options),restart:()=>createDurableLedger(options),path,advance:ms=>now+=ms}}
 const identity={uid:'verified-user',email:'owner@example.com',email_verified:true};
 const rates={inputMicrosPerMillion:1000000,outputMicrosPerMillion:1000000};
 function service(ledger,generate,extra={}){return createStyleService({ledger,verifyIdToken:async()=>identity,ownerKey:'private-owner-key',approvedEmails:[identity.email],rates,generate,...extra})}
@@ -28,7 +28,7 @@ test('refund only before dispatch; settlement idempotent; actual usage releases 
 test('expired leases refund undispatched work and charge uncertain dispatched work',async t=>{
  const {ledger,advance,restart}=await setup(t);
  const a=await ledger.reserve({uid:'u',lane:'shared',amount:100});const b=await ledger.reserve({uid:'u',lane:'shared',amount:100});await ledger.dispatch(b.id);
- advance(61000);const rows=(await restart().inspect()).records;
+ advance(121000);const rows=(await restart().inspect()).records;
  assert.equal(rows.find(r=>r.id===a.id).state,'cancelled');assert.equal(rows.find(r=>r.id===b.id).amount,100);assert.equal(rows.find(r=>r.id===b.id).state,'settled');
 });
 test('daily, rate, concurrency and zero-budget gates fail closed',async t=>{
@@ -39,13 +39,13 @@ test('daily, rate, concurrency and zero-budget gates fail closed',async t=>{
 });
 test('upstream failures retain conservative charge and never persist secrets/prompts',async t=>{
  const {ledger,path}=await setup(t);const result=await service(ledger,async()=>{throw Error('secret')})({token:'private-token',prompt:'editorial paper'});
- assert.equal(result.status,400);assert.equal((await ledger.inspect()).records[0].amount,6144);
+ assert.equal(result.status,502);assert.equal((await ledger.inspect()).records[0].amount,36864);
  const raw=await readFile(path);for(const secret of ['private-owner-key','private-token','editorial paper','owner@example.com','verified-user'])assert.equal(raw.includes(Buffer.from(secret)),false);
 });
 test('actual provider usage refunds balance, excess usage trips durable circuit breaker',async t=>{
  const {ledger}=await setup(t);const ok=await service(ledger,async()=>({content:JSON.stringify(themes[0]),usage:{prompt_tokens:100,completion_tokens:100}}))({token:'t',prompt:'paper'});
  assert.equal(ok.status,200);assert.equal((await ledger.inspect()).records[0].amount,200);
- const bad=await service(ledger,async()=>({content:JSON.stringify(themes[0]),usage:{prompt_tokens:5000,completion_tokens:100}}))({token:'t',prompt:'paper'});assert.equal(bad.status,400);assert.equal((await ledger.inspect()).tripped,true);
+ const bad=await service(ledger,async()=>({content:JSON.stringify(themes[0]),usage:{prompt_tokens:5000,completion_tokens:100}}))({token:'t',prompt:'paper'});assert.equal(bad.status,502);assert.equal((await ledger.inspect()).tripped,true);
  await assert.rejects(ledger.reserve({uid:'v',lane:'byok',amount:0}));
 });
 test('BYOK bypasses owner entitlement but never verified identity, quotas or transient handling',async t=>{
@@ -62,7 +62,7 @@ test('Supabase verifier asks Auth server and requires confirmed email',async()=>
  await assert.rejects(supabaseVerifier({auth:{getUser:async()=>({data:null,error:{message:'invalid'}})}})('t'));
 });
 test('provider output bounds and secret echoes are rejected',async t=>{
- const {ledger}=await setup(t);assert.equal((await service(ledger,async()=>JSON.stringify({...themes[0],name:'private-owner-key'}))({token:'t',prompt:'paper'})).status,400);
+ const {ledger}=await setup(t);assert.equal((await service(ledger,async()=>JSON.stringify({...themes[0],name:'private-owner-key'}))({token:'t',prompt:'paper'})).status,502);
  const adapter=createCerebrasAdapter(async()=>new Response('x'.repeat(33000)));await assert.rejects(adapter({key:'x',prompt:'paper',maxCompletionTokens:512}));
 });
 test('HTTP enforces origin, token, JSON fields and body size before service',async t=>{

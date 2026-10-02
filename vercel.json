@@ -2,7 +2,7 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "functions": {"api/**/*.js": {"maxDuration": 30}},
+  "functions": {"api/**/*.js": {"maxDuration": 90}},
   "headers": [{"source": "/(.*)", "headers": [
     {"key": "X-Content-Type-Options", "value": "nosniff"},
     {"key": "Referrer-Policy", "value": "no-referrer"},

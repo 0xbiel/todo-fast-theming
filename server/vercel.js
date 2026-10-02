@@ -22,7 +22,7 @@ export function createHostedHandler({env=process.env,clientFactory=createClient,
    const service=async payload=>{
     if(env.ENABLE_HOSTED_AI!=='true')return{status:503,error:'AI setup required.'};
     const policy=await d.ledger.policy();if(!policy?.enabled)return{status:503,error:'AI setup required.'};
-    return createStyleService({verifyIdToken:d.verifyIdToken,ledger:d.ledger,ownerKey:env.CEREBRAS_API_KEY,approvedEmails:policy.approvedEmails,rates:policy.rates,generate:createCerebrasAdapter(providerFetch)})(payload);
+    return createStyleService({verifyIdToken:d.verifyIdToken,ledger:d.ledger,ownerKey:env.CEREBRAS_API_KEY,approvedEmails:policy.approvedEmails,rates:policy.rates,maxCompletionTokens:policy.maxCompletionTokens??2048,generate:createCerebrasAdapter(providerFetch)})(payload);
    };
    return await createApiHandler({origin:d.origin,service,snapshots:env.ENABLE_HOSTED_SHARING==='true'?d.snapshots:undefined})(req,res);
   }catch{fail()}

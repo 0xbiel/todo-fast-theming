@@ -9,7 +9,9 @@ export function createSupabaseAdapter(client,redirectTo) {
   verifyEmailCode:(email,token)=>checked(client.auth.verifyOtp({email,token,type:'email'})),
   exchangeCode:code=>checked(client.auth.exchangeCodeForSession(code)),
   signOut:()=>checked(client.auth.signOut()),
-  subscribe:callback=>client.auth.onAuthStateChange((_event,session)=>callback(session?.user??null)).data.subscription,
+  subscribe:callback=>client.auth.onAuthStateChange((event,session)=>callback(session?.user??null,event)).data.subscription,
+  sessionUser:async()=>{const data=await checked(client.auth.getSession());return data.session?.user??null},
+  refresh:async()=>{const data=await checked(client.auth.refreshSession());if(!data.session)throw Error('Sign in required');return data.session.user},
   token:async()=>{const data=await checked(client.auth.getSession());if(!data.session?.access_token)throw Error('Sign in required');return data.session.access_token}
  };
 }

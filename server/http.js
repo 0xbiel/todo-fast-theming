@@ -36,7 +36,7 @@ export function createApiHandler({service,snapshots,origin}) {
 }
 export function createApiServer(options){
  const server=createServer(createApiHandler(options));
- server.requestTimeout=15000;server.headersTimeout=10000;server.maxHeadersCount=30;
+ server.requestTimeout=90000;server.headersTimeout=10000;server.maxHeadersCount=30;
  return server;
 }
 

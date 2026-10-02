@@ -25,12 +25,12 @@ test('hosted CSS diagnostics are preview-only, keep usage settlement and never e
  for(const VERCEL_ENV of ['preview','production',undefined]){
   const ops=[];
   const client={auth:{getUser:async()=>({data:{user:{id:'fixture-user',email:'fixture@example.com',email_confirmed_at:'yes'}}})},rpc:async(_name,{command})=>{ops.push(command.op);return{data:command.op==='policy'?{enabled:true,approvedEmails:['fixture@example.com'],rates:{inputMicrosPerMillion:990000,outputMicrosPerMillion:1490000}}:command.op==='reserve'?{id:'fixture-reservation'}:{}}}};
-  const theme={...visualFixtures.notebook,visual:{...visualFixtures.notebook.visual,canvasCss:'background-size:1rem 1rem'}};
+  const theme={...visualFixtures.notebook,visual:{...visualFixtures.notebook.visual,canvasCss:'background-image:url(https://private.example/mock-secret)' }};
   const handler=createHostedHandler({env:{VERCEL_ENV,APP_ORIGIN:'https://board.example',SUPABASE_URL:'https://db.example',SUPABASE_SERVER_KEY:'mock-server-only',ENABLE_HOSTED_AI:'true',CEREBRAS_API_KEY:'mock-owner-only'},clientFactory:()=>client,providerFetch:async()=>new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify(theme)}}],usage:{prompt_tokens:100,completion_tokens:100}}))});
   const res={headersSent:false,writeHead(status){this.status=status;this.headersSent=true},end(body){this.body=JSON.parse(body)}};
   await handler({url:'/api/style',method:'POST',headers:{origin:'https://board.example','content-type':'application/json',authorization:'Bearer fixture-token'},body:{prompt:'notebook paper'}},res);
   assert.equal(res.status,502);assert.equal(res.body.diagnostic.validation,'visual_css');assert.equal(res.body.diagnostic.field,'visual.canvasCss');
-  assert.equal(res.body.diagnostic.cssReason,VERCEL_ENV==='preview'?'unit':undefined);assert.equal(res.body.diagnostic.cssFeature,VERCEL_ENV==='preview'?'rem':undefined);
-  assert.ok(ops.includes('settle'));assert.doesNotMatch(JSON.stringify(res.body),/1rem|mock-owner-only|mock-server-only|fixture-token|canvasCss:/);
+  assert.equal(res.body.diagnostic.cssReason,VERCEL_ENV==='preview'?'node':undefined);assert.equal(res.body.diagnostic.cssFeature,VERCEL_ENV==='preview'?'url':undefined);
+  assert.ok(ops.includes('settle'));assert.doesNotMatch(JSON.stringify(res.body),/mock-secret|private.example|mock-owner-only|mock-server-only|fixture-token|canvasCss:/);
  }
 });

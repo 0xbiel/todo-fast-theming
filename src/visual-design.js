@@ -56,6 +56,57 @@ export function validateVisualCss(text,target){
  return css.generate(ast);
 }
 
+// Provider callers may simplify safe paint, then must run strict validation.
+// Never repair network/dynamic features, executable syntax or layout/control CSS.
+const cosmeticProperties=new Set([...Object.values(cssTargets).flatMap(values=>[...values]),'background','background-attachment','background-origin','background-clip','background-blend-mode','border','font','font-size','font-variant','line-height','color','text-shadow','text-decoration','text-align']);
+const repairableReasons=new Set(['important','grammar','shadow_count','font_family','complexity','function_count','number_range','unit','global_keyword','shadow_range','length_range','declaration_limit']);
+export function repairVisualCss(text,target){
+ if(typeof text!=='string'||text.length>4000||!cssTargets[target]||/[<>\\@]/.test(text))return validateVisualCss(text,target);
+ let ast;try{ast=css.parse(text,{context:'declarationList',positions:false})}catch{throw visualCssError('parse')}
+ // Inspect the complete input before dropping any declaration, including overflow.
+ ast.children.forEach(decl=>{
+  if(decl.type!=='Declaration')throw visualCssError('node_type');
+  if(!cosmeticProperties.has(decl.property.toLowerCase()))throw visualCssError('property',decl.property);
+  css.walk(decl.value,node=>{
+   if(['Url','Raw','Atrule','Rule'].includes(node.type))throw visualCssError('node',decl.property,node.type);
+   if(node.type==='Function'&&!cssFunctions.has(node.name.toLowerCase()))throw visualCssError('function',decl.property,node.name);
+  });
+ });
+ let result='';
+ ast.children.forEach(decl=>{
+  decl.property=decl.property.toLowerCase();
+  if(!cssTargets[target].has(decl.property))return;
+  decl.important=false;
+  let discard=false;
+  css.walk(decl.value,node=>{
+   if(!['Dimension','Number','Percentage'].includes(node.type))return;
+   const number=Number(node.value);
+   if(!Number.isFinite(number)||node.type==='Dimension'&&!['px','deg'].includes(node.unit.toLowerCase())){discard=true;return}
+   let min=-1000,max=1000;
+   if(['border-width','border-radius','letter-spacing'].includes(decl.property)){
+    if(node.type==='Percentage'){discard=true;return}
+    min=0;max=decl.property==='border-width'?4:decl.property==='border-radius'?32:2;
+   }else if(decl.property==='box-shadow'&&node.type==='Dimension'){min=-24;max=24;}
+   const bounded=Math.max(min,Math.min(max,number));if(bounded!==number)node.value=String(bounded);
+  });
+  if(discard)return;
+  const candidate=result+css.generate(decl)+';';
+  try{result=validateVisualCss(candidate,target)+';'}catch(error){if(!repairableReasons.has(error.cssReason))throw error;}
+ });
+ return validateVisualCss(result,target);
+}
+export function repairVisualTheme(input){
+ if(input?.visual===undefined)return input;
+ const visual=input.visual,keys=['canvasCss','cardCss','headingCss','titleCss','sceneSvg','cardSvg'];
+ if(!visual||Array.isArray(visual)||Object.keys(visual).length!==keys.length||Object.keys(visual).some(key=>!keys.includes(key)))throw Error('Invalid visual design');
+ const result={...visual};
+ for(const target of ['canvas','card','heading','title']){
+  try{result[target+'Css']=repairVisualCss(visual[target+'Css'],target)}catch(error){throw Object.assign(error,{validationField:'visual.'+target+'Css'})}
+ }
+ // SVG and all other schema/geometry remain unchanged for strict validation.
+ return {...input,visual:result};
+}
+
 const tags=new Set(['svg','g','defs','path','rect','circle','ellipse','line','polyline','polygon','linearGradient','radialGradient','stop','pattern']);
 const attrs=new Set(['viewBox','preserveAspectRatio','fill','stroke','stroke-width','stroke-linecap','stroke-linejoin','stroke-dasharray','opacity','fill-opacity','stroke-opacity','d','points','x','y','x1','y1','x2','y2','cx','cy','fx','fy','r','rx','ry','width','height','transform','id','offset','stop-color','stop-opacity','gradientUnits','patternUnits','patternTransform','gradientTransform']);
 const numberPattern=/^-?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;

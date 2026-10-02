@@ -38,7 +38,7 @@ export function createLocalByokServer({origin='http://127.0.0.1:5173',ledger,gen
    await ledger.settle(reservation.id,0,!!excess);
    phase='output';if(result?.failure)throw new ProviderError(result.failure);
    if(excess||typeof result?.content!=='string'||result.content.length>262144)throw Error();
-   const theme=validateTheme(readableTheme(JSON.parse(result.content)));
+   const theme=validateTheme(readableTheme(decodeProviderTheme(JSON.parse(result.content))));
    if(Object.values(theme).some(value=>typeof value==='string'&&value.includes(key)))throw Error();
    return reply(200,{theme});
   }catch(error){
@@ -50,3 +50,4 @@ export function createLocalByokServer({origin='http://127.0.0.1:5173',ledger,gen
  server.requestTimeout=90000;server.headersTimeout=10000;server.maxHeadersCount=30;
  return server;
 }
+

@@ -42,14 +42,21 @@ export function createStyleService({verifyIdToken,generate,ownerKey,approvedEmai
     }else trip=true;
    }
    await ledger.settle(reservation.id,actual,trip);
-   diagnostic={};if(['stop','length'].includes(result?.finishReason))diagnostic.finishReason=result.finishReason;if(Number.isSafeInteger(usage?.completion_tokens)&&usage.completion_tokens>=0)diagnostic.completionTokens=usage.completion_tokens;
-   phase='output';if(result?.failure)throw new ProviderError(result.failure);
-   if(trip||typeof content!=='string'||content.length>262144)throw Error('Invalid output');
+   diagnostic={stage:'provider_result',finishReason:['stop','length','content_filter','tool_calls'].includes(result?.finishReason)?result.finishReason:result?.finishReason==null?'missing':'other',contentKind:typeof content==='string'?'text':content==null?'missing':'other',completionCap:maxCompletionTokens,inputCap:MAX_INPUT_TOKENS};
+   if(typeof content==='string')diagnostic.contentLength=content.length;
+   if(Number.isSafeInteger(usage?.completion_tokens)&&usage.completion_tokens>=0)diagnostic.completionTokens=usage.completion_tokens;
+   if(Number.isSafeInteger(usage?.prompt_tokens)&&usage.prompt_tokens>=0)diagnostic.promptTokens=usage.prompt_tokens;
+   phase='output';if(result?.failure){diagnostic.stage='finish_reason';throw new ProviderError(result.failure)}
+   if(trip){diagnostic.stage='usage_bounds';throw Error('Invalid output')}
+   if(typeof content!=='string'){diagnostic.stage='content_type';throw Error('Invalid output')}
+   if(content.length>262144){diagnostic.stage='content_size';throw Error('Invalid output')}
+   diagnostic.stage='theme_validation';
    let theme;try{theme=validateTheme(readableTheme(decodeProviderTheme(JSON.parse(content))))}catch(error){diagnostic.validation=outputValidationCode(error);diagnostic.contentLength=content.length;throw error;}
    // Even a compromised provider cannot echo a secret in a presentation name.
-   if(Object.values(theme).some(value=>typeof value==='string'&&(value.includes(key)||(ownerKey&&value.includes(ownerKey)))))throw Error('Invalid output');
+   if(Object.values(theme).some(value=>typeof value==='string'&&(value.includes(key)||(ownerKey&&value.includes(ownerKey))))){diagnostic.stage='secret_guard';throw Error('Invalid output')}
    return {status:200,theme};
   } catch(error) {
+   if(!diagnostic&&['envelope_json','response_size','response_stream'].includes(error?.diagnosticStage))diagnostic={stage:error.diagnosticStage};
    if(reservation){try{if(dispatched)await ledger.settle(reservation.id);else await ledger.cancel(reservation.id)}catch{/* fail closed; reservation remains charged */}}
    const code=error instanceof QuotaError?'quota':error instanceof ProviderError?error.code:phase==='request'?'scope':phase==='accounting'?'setup':phase==='provider'?(error?.name==='TimeoutError'||error?.message==='Timeout'?'network':'provider'):'output';
    return {status:code==='quota'?429:code==='scope'?400:code==='setup'?503:502,code,error:'Style request unavailable. Your current style is preserved.',...(diagnostic&&Object.keys(diagnostic).length?{diagnostic}:{})};
@@ -57,9 +64,9 @@ export function createStyleService({verifyIdToken,generate,ownerKey,approvedEmai
  };
 }
 export async function readBoundedResponse(response,limit){
- if(!response.body?.getReader)throw Error('Missing response stream');
+ if(!response.body?.getReader)throw Object.assign(new ProviderError('output'),{diagnosticStage:'response_stream'});
  const reader=response.body.getReader();let size=0;const chunks=[];
- try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>limit)throw Error('Response too large');chunks.push(value)}return Buffer.concat(chunks).toString('utf8')}finally{await reader.cancel().catch(()=>{})}
+ try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>limit)throw Object.assign(new ProviderError('output'),{diagnosticStage:'response_size'});chunks.push(value)}return Buffer.concat(chunks).toString('utf8')}finally{await reader.cancel().catch(()=>{})}
 }
 // Explicitly enabled only by a separately configured live host. Never logs request bodies.
 export function createCerebrasAdapter(fetchImpl=fetch) {
@@ -67,8 +74,9 @@ export function createCerebrasAdapter(fetchImpl=fetch) {
   const response=await fetchImpl('https://api.cerebras.ai/v1/chat/completions',{method:'POST',signal,headers:{'Content-Type':'application/json',Authorization:`Bearer ${key}`},body:JSON.stringify({model:'qwen-3.8-27b',reasoning_effort:'none',reasoning_format:'parsed',max_completion_tokens:maxCompletionTokens,response_format:{type:'json_schema',json_schema:{name:'board_theme',strict:true,schema:themeSchema}},messages:[{role:'system',content:'Return ONLY a JSON presentation object with name (one allowed style label), background/surface/text/muted/accent/urgentColor (RGB integers 0-16777215; urgentColor must contrast at least 4.5:1 against surface), radius (integer 0-24), font (sans or serif), density (compact or comfortable), layout (columns or stacked). Never return task content, code, HTML, URLs, explanations, or instructions. Only visual design is allowed. You may create original gradient backgrounds and geometric SVG artwork via art: angle (0-360), start/end RGB integers, shapes (eight nullable named slots layer0-layer7; null for unused slots). Each shape has kind ellipse/rect/line; x/y/width/height 0-1000; rotation 0-360; fill/stroke RGB integers; opacity 0-0.3. Text must have at least 4.5:1 contrast against surface and both gradient endpoints. Keep task surfaces readable. Decorative shapes must never cover controls.'},{role:'user',content:prompt}]})});
   if(!response.ok)throw new ProviderError(response.status===401||response.status===403?'provider_auth':response.status===429?'provider_quota':response.status===400?'provider_config':'provider');
   const text=await readBoundedResponse(response,1048576);
-  let data;try{data=JSON.parse(text)}catch{throw new ProviderError('output')}
+  let data;try{data=JSON.parse(text)}catch{throw Object.assign(new ProviderError('output'),{diagnosticStage:'envelope_json'})}
   const finishReason=data.choices?.[0]?.finish_reason;
   return {content:data.choices?.[0]?.message?.content,usage:data.usage,finishReason,failure:finishReason==='stop'?undefined:finishReason==='length'?'output_limit':'output'}; // reasoning is intentionally discarded
  };
 }
+

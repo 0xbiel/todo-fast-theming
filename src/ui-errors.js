@@ -15,9 +15,19 @@ const messages={
  provider:'Cerebras could not complete this request. Your current design is preserved.',
  network:'The request timed out or could not reach the service. Your current design is preserved.'
 };
-export class UiError extends Error {constructor(code,diagnostic){super(messages[code]||messages.provider);this.code=code;if(code==='output'&&['fields','color','theme','layout','art','shape','geometry','priority_contrast','text_contrast','json'].includes(diagnostic?.validation))this.message+=' (Check: '+diagnostic.validation+'.)'}}
+// Diagnostics contain only fixed labels and bounded numbers, never provider text.
+export function safeDiagnosticText(d){
+ if(!d||typeof d!=='object')return '';
+ const parts=[];
+ const enums={stage:['provider_result','finish_reason','usage_bounds','content_type','content_size','theme_validation','secret_guard','envelope_json','response_size','response_stream','client_validation'],validation:['fields','color','theme','layout','art','shape','geometry','priority_contrast','text_contrast','json'],finishReason:['stop','length','content_filter','tool_calls','missing','other'],contentKind:['text','missing','other']};
+ for(const [key,allowed] of Object.entries(enums))if(allowed.includes(d[key]))parts.push(key+'='+d[key]);
+ for(const key of ['promptTokens','completionTokens','inputCap','completionCap','contentLength'])if(Number.isSafeInteger(d[key])&&d[key]>=0&&d[key]<=1000000000)parts.push(key+'='+d[key]);
+ return parts.length?' (Check: '+parts.join(', ')+'.)':'';
+}
+export class UiError extends Error {constructor(code,diagnostic){super(messages[code]||messages.provider);this.code=code;if(['output','output_limit'].includes(code))this.message+=safeDiagnosticText(diagnostic)}}
 export const styleErrorMessage=error=>error instanceof UiError?error.message:messages.provider;
 export function responseError(status,code,diagnostic){
  if(Object.hasOwn(messages,code))return new UiError(code,diagnostic);
  return new UiError(status===401?'auth':status===403?'approval':status===429?'quota':status===503?'setup':status===400?'scope':'provider');
 }
+

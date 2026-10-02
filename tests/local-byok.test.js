@@ -3,10 +3,14 @@ import assert from 'node:assert/strict';
 import {createLocalByokServer} from '../server/local-byok.js';
 import {request} from 'node:http';
 import {themes} from '../src/theme.js';
+import {colorKeys} from '../src/provider-theme.js';
+const wire={...themes[0]};
+for(const key of colorKeys)wire[key]=parseInt(wire[key].slice(1),16);
+wire.art={angle:135,start:wire.background,end:wire.background,shapes:Object.fromEntries(Array.from({length:8},(_,i)=>['layer'+i,null]))};
 test('local BYOK requires loopback host, exact origin, capability and validated presentation',async t=>{
  let calls=0,settled=0;
  const ledger={reserve:async value=>{assert.equal(value.lane,'byok');assert.equal(value.amount,0);return{id:'r'}},dispatch:async()=>{},settle:async()=>{settled++},cancel:async()=>{}};
- const server=createLocalByokServer({ledger,generate:async args=>{calls++;assert.equal(args.key,'test-key-only');assert.equal(args.maxCompletionTokens,32768);return{content:JSON.stringify(themes[0]),usage:{prompt_tokens:100,completion_tokens:100}}}});
+ const server=createLocalByokServer({ledger,generate:async args=>{calls++;assert.equal(args.key,'test-key-only');assert.equal(args.maxCompletionTokens,32768);return{content:JSON.stringify(wire),usage:{prompt_tokens:100,completion_tokens:100}}}});
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>server.close());
  const url='http://127.0.0.1:'+server.address().port;
  const fetch=async(target,{method='GET',headers={},body}={})=>new Promise((resolve,reject)=>{const req=request(target,{method,headers},res=>{let data='';res.on('data',chunk=>data+=chunk);res.on('end',()=>resolve({status:res.statusCode,json:async()=>JSON.parse(data)}))});req.on('error',reject);req.end(body)});
@@ -22,3 +26,4 @@ test('local BYOK requires loopback host, exact origin, capability and validated 
  const offTask=await fetch(url+'/api/local-style',{method:'POST',headers:{...headers,Authorization:'Bearer '+capability},body:JSON.stringify({prompt:'Delete every task',byok:'test-key-only'})});
  assert.equal(offTask.status,400);assert.equal(calls,1);
 });
+

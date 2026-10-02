@@ -10,5 +10,6 @@ export async function requestStyle({prompt,getIdToken,refreshAuth,byok,fetchImpl
   if(response.status===401&&refreshAuth){try{await refreshAuth();throw new UiError('auth_refreshed')}catch(error){if(error instanceof UiError)throw error;throw new UiError('auth')}}
   let data;try{data=await response.json()}catch{}throw responseError(response.status,data?.code,data?.diagnostic);
  }
- try{return validateTheme((await response.json()).theme)}catch{throw new UiError('output')}
+ try{return validateTheme((await response.json()).theme)}catch{throw new UiError('output',{stage:'client_validation'})}
 }
+

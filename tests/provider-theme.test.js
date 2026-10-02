@@ -9,7 +9,7 @@ test('provider conversion never discards malicious fields or accepts excess geom
 });
 test('diagnostics expose allowlisted categories only and preserve paid accounting',async()=>{
  let settlements=0;const service=createStyleService({verifyIdToken:async()=>({uid:'fixture',email:'fixture@example.com',email_verified:true}),ledger:{reserve:async()=>({id:'fixture'}),dispatch:async()=>{},settle:async()=>{settlements++}},rates:{inputMicrosPerMillion:990000,outputMicrosPerMillion:1490000},generate:async()=>({content:JSON.stringify({...wire(),background:-1}),usage:{prompt_tokens:100,completion_tokens:100},finishReason:'stop'})});
- const result=await service({token:'fixture',prompt:'calm ocean',byok:'mock-personal-key'});assert.equal(result.status,502);assert.equal(result.diagnostic.validation,'color');assert.ok(result.diagnostic.contentLength>0);assert.ok(settlements>=1);assert.equal(JSON.stringify(result).includes('mock-personal-key'),false);assert.equal(outputValidationCode(Error('secret raw output')),'json');assert.match(responseError(502,'output',result.diagnostic).message,/Check: color/);assert.equal(responseError(502,'output',{validation:'secret raw output'}).message.includes('secret'),false);
+ const result=await service({token:'fixture',prompt:'calm ocean',byok:'mock-personal-key'});assert.equal(result.status,502);assert.equal(result.diagnostic.validation,'color');assert.ok(result.diagnostic.contentLength>0);assert.ok(settlements>=1);assert.equal(JSON.stringify(result).includes('mock-personal-key'),false);assert.equal(outputValidationCode(Error('secret raw output')),'json');assert.match(responseError(502,'output',result.diagnostic).message,/validation=color/);assert.equal(responseError(502,'output',{validation:'secret raw output'}).message.includes('secret'),false);
 });
 
 test('reported style prompts succeed through reasoning-off provider decoding without changing task fields',async()=>{
@@ -17,3 +17,4 @@ test('reported style prompts succeed through reasoning-off provider decoding wit
  const service=createStyleService({verifyIdToken:async()=>({uid:'fixture',email:'fixture@example.com',email_verified:true}),ledger:{reserve:async()=>({id:'fixture'}),dispatch:async()=>{},settle:async()=>{}},rates:{inputMicrosPerMillion:990000,outputMicrosPerMillion:1490000},generate:adapter});
  for(const prompt of ['calm ocean','realistic calm ocean','leather background with post its as the cards']){const r=await service({token:'fixture',prompt,byok:'mock-personal-key'});assert.equal(r.status,200);assert.deepEqual(r.theme,themes[2]);assert.equal(JSON.stringify(r).includes('never displayed'),false);assert.equal('tasks' in r.theme,false);}
 });
+

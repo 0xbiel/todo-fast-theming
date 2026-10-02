@@ -1,3 +1,4 @@
+import {validateVisualDesign} from './visual-design.js';
 import {validateArt} from './art.js';
 export const themes = [
 { name: 'Midnight', background: '#101116', surface: '#191b23', text: '#f0f1f5', muted: '#9699ac', accent: '#a799ff', urgentColor: '#ff858b', radius: 12, font: 'sans', density: 'comfortable', layout: 'columns' },
@@ -7,11 +8,13 @@ export const themes = [
 ].map(theme=>({...theme,art:validateArt(undefined,theme.background)}));
 export function validateTheme(input) {
  if(input&&typeof input==='object'&&!Array.isArray(input)&&input.urgentColor===undefined)input={...input,urgentColor:input.accent};
- const keys = ['name','background','surface','text','muted','accent','urgentColor','art','radius','font','density','layout'];
+ const keys = ['name','background','surface','text','muted','accent','urgentColor','art','radius','font','density','layout',...(input?.visual!==undefined?['visual']:[])];
  if (!input || Array.isArray(input) || Object.keys(input).some(k => !keys.includes(k))) throw new Error('Unsupported presentation field');
  for (const key of ['background','surface','text','muted','accent','urgentColor']) if (!/^#[0-9a-f]{6}$/i.test(input[key])) throw new Error('Invalid color');
  if (typeof input.name !== 'string' || input.name.length > 40 || !Number.isInteger(input.radius) || input.radius < 0 || input.radius > 24 || !['sans','serif'].includes(input.font) || !['compact','comfortable'].includes(input.density)) throw new Error('Invalid theme');
  input={...input,art:validateArt(input.art,input.background)};
+ if(input.visual!==undefined)input.visual=validateVisualDesign(input.visual);
+ if(input.visual!==undefined&&(contrast(input.muted,input.surface)<4.5||contrast(input.accent,input.surface)<4.5))throw Error('Text needs contrast');
  if(contrast(input.urgentColor,input.surface)<4.5)throw Error('Priority color needs contrast');
  for(const background of [input.surface,input.art.start,input.art.end])if(contrast(input.text,background)<4.5)throw Error('Text needs contrast');
  if (!['columns','stacked'].includes(input.layout)) throw new Error('Invalid layout');
@@ -40,6 +43,8 @@ export function readableTheme(input){
  const theme={...input};
  if(contrast(theme.text,theme.surface)<4.5)theme.text=contrast('#000000',theme.surface)>contrast('#ffffff',theme.surface)?'#000000':'#ffffff';
  if(hex(theme.urgentColor)&&contrast(theme.urgentColor,theme.surface)<4.5)theme.urgentColor=hex(theme.accent)&&contrast(theme.accent,theme.surface)>=4.5?theme.accent:theme.text;
+ if(theme.visual!==undefined){for(const key of ['muted','accent'])if(hex(theme[key])&&contrast(theme[key],theme.surface)<4.5)theme[key]=theme.text;}
  if(theme.art&&typeof theme.art==='object'&&!Array.isArray(theme.art)){theme.art={...theme.art};for(const key of ['start','end'])if(hex(theme.art[key])&&contrast(theme.text,theme.art[key])<4.5)theme.art[key]=hex(theme.background)&&contrast(theme.text,theme.background)>=4.5?theme.background:theme.surface;}
  return theme;
 }
+

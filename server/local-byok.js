@@ -39,7 +39,7 @@ export function createLocalByokServer({origin='http://127.0.0.1:5173',ledger,gen
    phase='output';if(result?.failure)throw new ProviderError(result.failure);
    if(excess||typeof result?.content!=='string'||result.content.length>262144)throw Error();
    const theme=validateTheme(readableTheme(decodeProviderTheme(JSON.parse(result.content))));
-   if(Object.values(theme).some(value=>typeof value==='string'&&value.includes(key)))throw Error();
+   if(JSON.stringify(theme).includes(key))throw Error();
    return reply(200,{theme});
   }catch(error){
    if(reservation){try{if(dispatched)await ledger.settle(reservation.id,0);else await ledger.cancel(reservation.id)}catch{}}

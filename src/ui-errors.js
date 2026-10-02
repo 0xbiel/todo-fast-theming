@@ -20,7 +20,7 @@ const messages={
 export function safeDiagnosticText(d){
  if(!d||typeof d!=='object')return '';
  const parts=[];
- const enums={stage:['provider_result','finish_reason','usage_bounds','content_type','content_size','theme_validation','secret_guard','envelope_json','response_size','response_stream','client_validation'],validation:['fields','color','theme','layout','art','shape','geometry','priority_contrast','text_contrast','json'],finishReason:['stop','length','content_filter','tool_calls','missing','other'],contentKind:['text','missing','other']};
+ const enums={stage:['provider_result','finish_reason','usage_bounds','content_type','content_size','theme_validation','secret_guard','envelope_json','response_size','response_stream','client_validation'],validation:['visual_css','visual_svg','visual','fields','color','theme','layout','art','shape','geometry','priority_contrast','text_contrast','json'],finishReason:['stop','length','content_filter','tool_calls','missing','other'],contentKind:['text','missing','other']};
  for(const [key,allowed] of Object.entries(enums))if(allowed.includes(d[key]))parts.push(key+'='+d[key]);
  for(const key of ['promptTokens','completionTokens','inputCap','completionCap','contentLength'])if(Number.isSafeInteger(d[key])&&d[key]>=0&&d[key]<=1000000000)parts.push(key+'='+d[key]);
  return parts.length?' (Check: '+parts.join(', ')+'.)':'';

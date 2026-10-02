@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';import {dec
 function wire(){const t=themes[2],w={...t};for(const k of colorKeys)w[k]=parseInt(t[k].slice(1),16);w.art={angle:135,start:w.background,end:w.background,shapes:Object.fromEntries(Array.from({length:8},(_,i)=>['layer'+i,null]))};return w;}
 test('constrained RGB and fixed decoration slots convert into bounded existing themes',()=>{
  const w=wire();w.art.shapes.layer0={kind:'ellipse',x:50,y:10,width:100,height:100,rotation:0,fill:16777215,stroke:0,opacity:.1};const t=validateTheme(readableTheme(decodeProviderTheme(w)));assert.equal(t.background,themes[2].background);assert.equal(t.art.shapes.length,1);assert.equal(t.art.shapes[0].fill,'#ffffff');
- assert.equal(themeSchema.$defs.color.maximum,16777215);assert.equal(themeSchema.properties.art.properties.shapes.required.length,8);assert.equal(themeSchema.properties.name.enum.every(x=>x.length<=40),true);
+ assert.equal(themeSchema.$defs.color.properties.r.maximum,255);assert.equal(themeSchema.properties.art.properties.shapes.required.length,8);assert.equal(themeSchema.properties.name.enum.every(x=>x.length<=40),true);
 });
 test('provider conversion never discards malicious fields or accepts excess geometry/colors',()=>{
  assert.throws(()=>decodeProviderTheme({...wire(),script:'malicious'}));const extra=wire();extra.art.shapes.layer8=null;assert.throws(()=>decodeProviderTheme(extra));assert.throws(()=>decodeProviderTheme({...wire(),background:16777216}));const shape=wire();shape.art.shapes.layer0={kind:'rect',x:0,y:0,width:1,height:1,rotation:0,fill:0,stroke:0,opacity:.1,onClick:'malicious'};assert.throws(()=>validateTheme(decodeProviderTheme(shape)));
@@ -21,11 +21,11 @@ test('reported style prompts succeed through reasoning-off provider decoding wit
 
 test('provider schema reuses bounded definitions to stay within the input reservation',()=>{
  const encoded=JSON.stringify(themeSchema);
- assert.ok(encoded.length<2500);
+ assert.ok(encoded.length<3600);
  assert.deepEqual(themeSchema.properties.background,{$ref:'#/$defs/color'});
  const shape=themeSchema.$defs.shape;
  assert.equal(shape.additionalProperties,false);assert.equal(shape.properties.opacity.maximum,.3);
  for(const slot of Object.values(themeSchema.properties.art.properties.shapes.properties))assert.deepEqual(slot,{anyOf:[{$ref:'#/$defs/shape'},{type:'null'}]});
  assert.deepEqual(shape.properties.fill,{$ref:'#/$defs/color'});
- assert.equal(themeSchema.$defs.color.minimum,0);assert.equal(themeSchema.$defs.color.maximum,16777215);
+ assert.equal(themeSchema.$defs.color.properties.r.minimum,0);assert.equal(themeSchema.$defs.color.properties.r.maximum,255);
 });

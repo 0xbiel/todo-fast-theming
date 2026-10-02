@@ -14,3 +14,21 @@
 .priority-indicator{display:inline-flex;align-items:center;gap:6px;font-size:10px;line-height:1.3;color:var(--muted);vertical-align:middle;white-space:nowrap}.priority-signal{display:inline-flex;align-items:flex-end;gap:2px;height:13px;flex:none}.signal-bar{display:block;width:3px;border:1px solid currentColor;border-radius:1px;opacity:.3}.signal-bar.filled{background:currentColor;opacity:1}.priority-indicator.urgent{color:var(--urgent);background:var(--surface);border:1px solid var(--urgent);border-radius:4px;padding:3px 5px}.task-properties>span>button{display:inline-flex;align-items:center;gap:7px}.popover .priority-indicator{font-size:12px}.snapshot-shell .card-bottom{justify-content:flex-start;flex-wrap:wrap;gap:10px}
 
 .shell{position:relative;isolation:isolate}.background-art{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:-1}.shell main{position:relative}.control-wrap{z-index:30}
+
+
+/* Model-authored paint lives behind independently readable, trusted controls. */
+.visual-canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden;contain:paint;background-color:var(--bg)}
+.visual-scene{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.visual-design .board .card{position:relative;isolation:isolate}
+.visual-card-art{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:-1;overflow:hidden}
+.visual-design .card .task-top,.visual-design .card .card-bottom,.visual-design .card h3{background:var(--surface);border-radius:3px;color:var(--text)}
+.visual-design .card h3{padding:3px 5px;margin-left:-3px;margin-right:-3px}
+.visual-design .heading,.visual-design .toolbar,.visual-design .board .column>h2,.visual-design .board-footer{background:var(--surface);border-radius:6px;padding:8px 10px;color:var(--text)}
+.visual-design .primary{color:var(--surface);background:var(--accent)}
+.visual-design .feedback{display:table;max-width:100%;margin:0 auto 12px;padding:5px 12px;border-radius:12px;color:#f5f5fa;background:#242631;text-shadow:none}
+.visual-design .pill-caption{display:table;margin:12px auto 0;padding:3px 8px;border-radius:8px;background:#242631;color:#c8cad5}
+
+.visual-design header{background:var(--surface);padding-left:12px;padding-right:12px;border-radius:0 0 8px 8px}
+
+.visual-design .board button:focus-visible{outline:2px solid var(--text);outline-offset:2px;box-shadow:0 0 0 4px var(--surface)}
+.visual-design .board .task-title{font-size:14px;line-height:1.5}

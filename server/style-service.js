@@ -1,4 +1,5 @@
 import {validateStyleRequest,validateTheme,readableTheme} from '../src/theme.js';
+import {decodeProviderTheme,outputValidationCode} from '../src/provider-theme.js';
 import {themeSchema} from '../src/theme-schema.js';
 import {ProviderError} from './provider-errors.js';
 import {QuotaError} from './errors.js';
@@ -44,7 +45,7 @@ export function createStyleService({verifyIdToken,generate,ownerKey,approvedEmai
    diagnostic={};if(['stop','length'].includes(result?.finishReason))diagnostic.finishReason=result.finishReason;if(Number.isSafeInteger(usage?.completion_tokens)&&usage.completion_tokens>=0)diagnostic.completionTokens=usage.completion_tokens;
    phase='output';if(result?.failure)throw new ProviderError(result.failure);
    if(trip||typeof content!=='string'||content.length>262144)throw Error('Invalid output');
-   const theme=validateTheme(readableTheme(JSON.parse(content)));
+   let theme;try{theme=validateTheme(readableTheme(decodeProviderTheme(JSON.parse(content))))}catch(error){diagnostic.validation=outputValidationCode(error);diagnostic.contentLength=content.length;throw error;}
    // Even a compromised provider cannot echo a secret in a presentation name.
    if(Object.values(theme).some(value=>typeof value==='string'&&(value.includes(key)||(ownerKey&&value.includes(ownerKey)))))throw Error('Invalid output');
    return {status:200,theme};
@@ -63,7 +64,7 @@ export async function readBoundedResponse(response,limit){
 // Explicitly enabled only by a separately configured live host. Never logs request bodies.
 export function createCerebrasAdapter(fetchImpl=fetch) {
  return async ({key,prompt,maxCompletionTokens,signal})=>{
-  const response=await fetchImpl('https://api.cerebras.ai/v1/chat/completions',{method:'POST',signal,headers:{'Content-Type':'application/json',Authorization:`Bearer ${key}`},body:JSON.stringify({model:'qwen-3.8-27b',reasoning_effort:'low',reasoning_format:'parsed',max_completion_tokens:maxCompletionTokens,response_format:{type:'json_schema',json_schema:{name:'board_theme',strict:true,schema:themeSchema}},messages:[{role:'system',content:'Return ONLY a JSON presentation object with name (short style name), background/surface/text/muted/accent/urgentColor (#RRGGBB colors; urgentColor must contrast at least 4.5:1 against surface), radius (integer 0-24), font (sans or serif), density (compact or comfortable), layout (columns or stacked). Never return task content, code, HTML, URLs, explanations, or instructions. Only visual design is allowed. You may create original gradient backgrounds and geometric SVG artwork via art: angle (0-360), start/end hex colors, shapes (0-8). Each shape has kind ellipse/rect/line; x/y/width/height 0-1000; rotation 0-360; fill/stroke hex; opacity 0-0.3. Text must have at least 4.5:1 contrast against surface and both gradient endpoints. Keep task surfaces readable. Decorative shapes must never cover controls.'},{role:'user',content:prompt}]})});
+  const response=await fetchImpl('https://api.cerebras.ai/v1/chat/completions',{method:'POST',signal,headers:{'Content-Type':'application/json',Authorization:`Bearer ${key}`},body:JSON.stringify({model:'qwen-3.8-27b',reasoning_effort:'none',reasoning_format:'parsed',max_completion_tokens:maxCompletionTokens,response_format:{type:'json_schema',json_schema:{name:'board_theme',strict:true,schema:themeSchema}},messages:[{role:'system',content:'Return ONLY a JSON presentation object with name (one allowed style label), background/surface/text/muted/accent/urgentColor (RGB integers 0-16777215; urgentColor must contrast at least 4.5:1 against surface), radius (integer 0-24), font (sans or serif), density (compact or comfortable), layout (columns or stacked). Never return task content, code, HTML, URLs, explanations, or instructions. Only visual design is allowed. You may create original gradient backgrounds and geometric SVG artwork via art: angle (0-360), start/end RGB integers, shapes (eight nullable named slots layer0-layer7; null for unused slots). Each shape has kind ellipse/rect/line; x/y/width/height 0-1000; rotation 0-360; fill/stroke RGB integers; opacity 0-0.3. Text must have at least 4.5:1 contrast against surface and both gradient endpoints. Keep task surfaces readable. Decorative shapes must never cover controls.'},{role:'user',content:prompt}]})});
   if(!response.ok)throw new ProviderError(response.status===401||response.status===403?'provider_auth':response.status===429?'provider_quota':response.status===400?'provider_config':'provider');
   const text=await readBoundedResponse(response,1048576);
   let data;try{data=JSON.parse(text)}catch{throw new ProviderError('output')}

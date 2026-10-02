@@ -36,7 +36,7 @@ test('provider request uses strict presentation schema and bounded parsed reason
  let request;
  const adapter=createCerebrasAdapter(async(_url,options)=>{request=JSON.parse(options.body);return new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify(themes[0])}}]}))});
  await adapter({key:'mock-only',prompt:'paper',maxCompletionTokens:512});
- assert.equal(request.reasoning_effort,'low');assert.equal(request.max_completion_tokens,512);
+ assert.equal(request.reasoning_effort,'none');assert.equal(request.max_completion_tokens,512);
  assert.equal(request.response_format.json_schema.strict,true);
  const schema=request.response_format.json_schema.schema;
  assert.equal(schema.additionalProperties,false);assert.equal(schema.properties.radius.maximum,24);

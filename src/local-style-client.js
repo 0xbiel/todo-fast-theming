@@ -7,6 +7,6 @@ export async function requestLocalStyle({prompt,byok,fetchImpl=fetch}) {
  if(!session.ok)throw Error('Local backend unavailable.');
  const {capability}=await session.json();
  const response=await fetchImpl('/api/local-style',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${capability}`},body:JSON.stringify({prompt:request,byok}),signal:AbortSignal.timeout(90000),cache:'no-store',credentials:'omit'});
- if(!response.ok){let code;try{code=(await response.json()).code}catch{}throw responseError(response.status,code)}
+ if(!response.ok){let data;try{data=await response.json()}catch{}throw responseError(response.status,data?.code,data?.diagnostic)}
  return validateTheme((await response.json()).theme);
 }

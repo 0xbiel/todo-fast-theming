@@ -15,9 +15,9 @@ const messages={
  provider:'Cerebras could not complete this request. Your current design is preserved.',
  network:'The request timed out or could not reach the service. Your current design is preserved.'
 };
-export class UiError extends Error {constructor(code){super(messages[code]||messages.provider);this.code=code}}
+export class UiError extends Error {constructor(code,diagnostic){super(messages[code]||messages.provider);this.code=code;if(code==='output'&&['fields','color','theme','layout','art','shape','geometry','priority_contrast','text_contrast','json'].includes(diagnostic?.validation))this.message+=' (Check: '+diagnostic.validation+'.)'}}
 export const styleErrorMessage=error=>error instanceof UiError?error.message:messages.provider;
-export function responseError(status,code){
- if(Object.hasOwn(messages,code))return new UiError(code);
+export function responseError(status,code,diagnostic){
+ if(Object.hasOwn(messages,code))return new UiError(code,diagnostic);
  return new UiError(status===401?'auth':status===403?'approval':status===429?'quota':status===503?'setup':status===400?'scope':'provider');
 }

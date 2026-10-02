@@ -12,7 +12,7 @@ Restyle never generates pretend results in production. Explicit mocks require bo
 
 ## Cerebras limits and failure handling
 
-Latest user-requested configuration: qwen-3.8-27b, reasoning_effort=low, reasoning_format=parsed, max_completion_tokens=32768. This is the current model maximum, not literal unlimited output. Reasoning and final output share this cap; reasoning is discarded. A strict JSON schema is sent; final content is validated on server and client. There are no automatic paid retries.
+Latest user-requested configuration: qwen-3.8-27b, reasoning_effort=none, reasoning_format=parsed, max_completion_tokens=32768. This is the current model maximum, not literal unlimited output. Reasoning and final output share this cap; reasoning is discarded. A strict JSON schema is sent; final content is validated on server and client. There are no automatic paid retries.
 
 Transport receives at most 1 MiB, final JSON at most 256 KiB; renderer complexity is separately bounded. Provider deadline is 45 seconds, browser deadline 90 seconds, Vercel function maximum 90 seconds, and new accounting leases 120 seconds. Invalid/incomplete output fails closed without displaying reasoning or raw responses. Safe error codes distinguish auth, setup, approval, quota, rejected API key/model configuration, truncation, network failure and invalid output. Diagnostics contain only allowed finish reasons and numeric completion usage. Consumed usage is settled even when the design is rejected. Unknown dispatched usage retains the full reservation; only undispatched work may be cancelled/refunded. Exceeding usage bounds trips a durable budget breaker.
 
@@ -44,7 +44,7 @@ Migration 202610020001_board_private.sql creates private policy/reservations/sna
 
 Recommended separately reviewed policy update after migration: existing user_daily=3 and global_daily=3 now apply only to BYOK; shared_user_daily=20 and shared_global_daily=20; per_minute=3 across both lanes; concurrent=1 globally; budget_micros=5000000; approved_emails contains only the owner-approved verified lower-case address in private DB configuration. enabled=true. The $5 budget is aggregate per UTC day, not per user. Requests including failures count against quotas. Three BYOK requests cannot block the owner's twenty shared requests.
 
-**Rollout order:** deploy compatible source first, apply reviewed migration, then configure the reviewed policy. Until the new RPC exposes maxCompletionTokens, hosted source intentionally honors the previous 2048 cap so DB cost reservations stay correct; low reasoning and safe errors still deploy immediately. Only after migration does hosted AI use the requested 32768 cap. Local BYOK already uses 32768. Never claim the larger hosted cap is active solely from a Git push.
+**Rollout order:** deploy compatible source first, apply reviewed migration, then configure the reviewed policy. Until the new RPC exposes maxCompletionTokens, hosted source intentionally honors the previous 2048 cap so DB cost reservations stay correct; disabled reasoning and safe errors still deploy immediately. Only after migration does hosted AI use the requested 32768 cap. Local BYOK already uses 32768. Never claim the larger hosted cap is active solely from a Git push.
 
 ## Explicit snapshot sharing
 
@@ -57,3 +57,5 @@ Private/local by default. Publication captures validated design plus trusted exa
 ## Temporary request-count testing switch
 
 Apply reviewed migration 003 after 002, then separately set `request_limits_enabled=false` in the private policy. This explicitly disables per-minute and both lanes’ per-user/aggregate daily request counts. It preserves verified authentication, shared email approval, global concurrency, usage history, accounting, cap/rates, circuit breaker, and the $5 aggregate shared UTC-day spending ceiling. Defaults remain enabled. Re-enable with `request_limits_enabled=true`; existing history immediately counts again. No counter reset or key change is needed. This switch does not make a reached shared spending ceiling disappear, and does not bypass a tripped breaker.
+
+Provider schema now uses bounded integer RGB colors, enum style names and eight nullable named shape slots. Trusted decoding converts this into the existing validated client theme. This closes documented strict-schema gaps: unsupported string patterns/lengths and array-length constraints previously allowed outputs the app rejected. Known validation failures include only an allowlisted category, final-content length and finish/usage metadata, never raw output. Historical failed output was not retained, so its exact rejection remains unconfirmed.

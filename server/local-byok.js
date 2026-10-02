@@ -1,3 +1,4 @@
+import {decodeProviderTheme} from '../src/provider-theme.js';
 import {createServer} from 'node:http';
 import {randomBytes,timingSafeEqual} from 'node:crypto';
 import {validateStyleRequest,validateTheme,readableTheme} from '../src/theme.js';

@@ -26,9 +26,9 @@ test('complete valid-schema designs with poor model-chosen contrast are safely r
  const service=createStyleService({verifyIdToken:async()=>({uid:'u',email:'x@y.z',email_verified:true}),generate:async()=>({content:JSON.stringify(raw),finishReason:'stop',usage:{prompt_tokens:100,completion_tokens:200}}),ownerKey:'mock-key',approvedEmails:['x@y.z'],ledger:{reserve:async()=>({id:'r'}),dispatch:async()=>{},settle:async()=>{},cancel:async()=>{}},rates:{inputMicrosPerMillion:1000000,outputMicrosPerMillion:1000000}});
  const result=await service({token:'verified',prompt:'leather background with post its as the cards'});assert.equal(result.status,200);assert.equal(result.theme.text,'#000000');assert.equal(result.theme.urgentColor,'#000000');
 });
-test('latest defaults request provider maximum with low reasoning and reserve matching worst-case cost',async()=>{
+test('latest defaults request provider maximum with no reasoning and reserve matching worst-case cost',async()=>{
  let cap,effort,reserved;
  const adapter=createCerebrasAdapter(async(_url,options)=>{const payload=JSON.parse(options.body);cap=payload.max_completion_tokens;effort=payload.reasoning_effort;return new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify(themes[0]),reasoning:'x'.repeat(40000)}}],usage:{prompt_tokens:100,completion_tokens:10000}}))});
  const service=createStyleService({verifyIdToken:async()=>({uid:'u',email:'x@y.z',email_verified:true}),generate:adapter,ownerKey:'mock-key',approvedEmails:['x@y.z'],ledger:{reserve:async value=>{reserved=value.amount;return{id:'r'}},dispatch:async()=>{},settle:async()=>{},cancel:async()=>{}},rates:{inputMicrosPerMillion:990000,outputMicrosPerMillion:1490000}});
- const result=await service({token:'verified',prompt:'calm ocean'});assert.equal(result.status,200);assert.equal(cap,32768);assert.equal(effort,'low');assert.equal(reserved,52880);
+ const result=await service({token:'verified',prompt:'calm ocean'});assert.equal(result.status,200);assert.equal(cap,32768);assert.equal(effort,'none');assert.equal(reserved,52880);
 });

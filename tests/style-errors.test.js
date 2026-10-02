@@ -1,13 +1,13 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {requestStyle} from '../src/style-client.js';import {validateStyleRequest,themes} from '../src/theme.js';import {styleErrorMessage,UiError} from '../src/ui-errors.js';import {createStyleService,createCerebrasAdapter} from '../server/style-service.js';
+import test from 'node:test';import assert from 'node:assert/strict';import {requestStyle,createStyleRequester} from '../src/style-client.js';import {validateStyleRequest,themes} from '../src/theme.js';import {styleErrorMessage,UiError} from '../src/ui-errors.js';import {createStyleService,createCerebrasAdapter} from '../server/style-service.js';
 test('reported user prompts are visual requests',()=>{for(const prompt of ['calm ocean','realistic calm ocean','leather background with post its as the cards'])assert.equal(validateStyleRequest(prompt),prompt)});
 test('client classifies auth/setup/quota/provider errors and never renders response freeform',async()=>{
  for(const [status,code] of [[401,'auth'],[503,'setup'],[429,'quota'],[502,'provider_auth'],[502,'provider_config'],[502,'output_limit'],[502,'output']]){
-  await assert.rejects(requestStyle({prompt:'calm ocean',getIdToken:async()=>'mock-token',fetchImpl:async()=>new Response(JSON.stringify({code,error:'private raw freeform should not display'}),{status})}),error=>error.code===code&&!error.message.includes('private'));
+  await assert.rejects(requestStyle({prompt:'calm ocean',getIdToken:async()=>'mock-token',fetchImpl:async()=>new Response(JSON.stringify({code,error:'private raw freeform should not display'}),{status,headers:{'Content-Type':'application/json'}})}),error=>error.code===code&&!error.message.includes('private'));
  }
  assert.equal(styleErrorMessage(Error('secret raw response')).includes('secret'),false);
 });
 test('401 refresh is bounded and never automatically retries a potentially paid style call',async()=>{
- let requests=0,refreshes=0;await assert.rejects(requestStyle({prompt:'calm ocean',getIdToken:async()=>'mock-token',refreshAuth:async()=>refreshes++,fetchImpl:async()=>{requests++;return new Response('{}',{status:401})}}),error=>error.code==='auth_refreshed');assert.equal(requests,1);assert.equal(refreshes,1);
+ let requests=0,refreshes=0;await assert.rejects(requestStyle({prompt:'calm ocean',getIdToken:async()=>'mock-token',refreshAuth:async()=>refreshes++,fetchImpl:async()=>{requests++;return new Response('{"code":"auth"}',{status:401,headers:{'Content-Type':'application/json'}})}}),error=>error.code==='auth_refreshed');assert.equal(requests,1);assert.equal(refreshes,1);
 });
 test('truncated response retains exact consumed charge and exposes safe diagnostic',async()=>{
  let charged,usedCap;
@@ -31,4 +31,35 @@ test('latest defaults request provider maximum with no reasoning and reserve mat
  const adapter=createCerebrasAdapter(async(_url,options)=>{const payload=JSON.parse(options.body);cap=payload.max_completion_tokens;effort=payload.reasoning_effort;return new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify(themes[0]),reasoning:'x'.repeat(40000)}}],usage:{prompt_tokens:100,completion_tokens:10000}}))});
  const service=createStyleService({verifyIdToken:async()=>({uid:'u',email:'x@y.z',email_verified:true}),generate:adapter,ownerKey:'mock-key',approvedEmails:['x@y.z'],ledger:{reserve:async value=>{reserved=value.amount;return{id:'r'}},dispatch:async()=>{},settle:async()=>{},cancel:async()=>{}},rates:{inputMicrosPerMillion:990000,outputMicrosPerMillion:1490000}});
  const result=await service({token:'verified',prompt:'calm ocean'});assert.equal(result.status,200);assert.equal(cap,32768);assert.equal(effort,'none');assert.equal(reserved,52880);
+});
+
+test('style POST carries existing same-origin preview access but never follows a redirect',async()=>{
+ let request;
+ const call=createStyleRequester();
+ await call({prompt:'paper',getIdToken:async()=>'mock-token',byok:'mock-key',fetchImpl:async(url,options)=>{request={url,options};return new Response(JSON.stringify({theme:themes[0]}),{headers:{'Content-Type':'application/json'}})}});
+ assert.equal(request.url,'/api/style');assert.equal(request.options.credentials,'same-origin');assert.equal(request.options.redirect,'error');assert.equal(request.options.headers.Authorization,'Bearer mock-token');
+ assert.equal(request.options.cache,'no-store');
+});
+test('platform and unmarked 401 responses never trigger an app session refresh or echo response data',async()=>{
+ for(const [body,type] of [['<html>private hosting response</html>','text/html'],['{"error":"private hosting response"}','application/json'],['{"code":"auth"}','text/plain'],['{broken','application/json']]){
+  let refreshes=0,requests=0;const call=createStyleRequester();
+  await assert.rejects(call({prompt:'paper',getIdToken:async()=>'mock-token',refreshAuth:async()=>refreshes++,fetchImpl:async()=>{requests++;return new Response(body,{status:401,headers:{'Content-Type':type}})}}),error=>error.code==='access'&&!error.message.includes('private hosting response'));
+  assert.equal(refreshes,0);assert.equal(requests,1);
+ }
+});
+test('consecutive app authentication rejections refresh once across manual retries and recover after success',async()=>{
+ const call=createStyleRequester();let requests=0,refreshes=0,rejected=true;
+ const options={prompt:'paper',getIdToken:async()=>'mock-token',refreshAuth:async()=>refreshes++,fetchImpl:async()=>{requests++;return new Response(JSON.stringify(rejected?{code:'auth'}:{theme:themes[0]}),{status:rejected?401:200,headers:{'Content-Type':'application/json'}})}};
+ await assert.rejects(call(options),error=>error.code==='auth_refreshed');
+ await assert.rejects(call(options),error=>error.code==='auth_rejected');
+ assert.equal(refreshes,1);assert.equal(requests,2);
+ rejected=false;assert.deepEqual(await call(options),themes[0]);
+ rejected=true;await assert.rejects(call(options),error=>error.code==='auth_refreshed');
+ assert.equal(refreshes,2);assert.equal(requests,4);
+});
+test('failed refresh and redirect rejection never replay the style POST',async()=>{
+ let requests=0;const call=createStyleRequester();
+ await assert.rejects(call({prompt:'paper',getIdToken:async()=>'mock-token',refreshAuth:async()=>{throw Error('private refresh failure')},fetchImpl:async()=>{requests++;return new Response('{"code":"auth"}',{status:401,headers:{'Content-Type':'application/json'}})}}),error=>error.code==='auth'&&!error.message.includes('private'));
+ assert.equal(requests,1);
+ await assert.rejects(createStyleRequester()({prompt:'paper',getIdToken:async()=>'mock-token',fetchImpl:async(_url,options)=>{assert.equal(options.redirect,'error');throw TypeError('redirect rejected')}}),error=>error.code==='network');
 });

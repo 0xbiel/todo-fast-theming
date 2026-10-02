@@ -2,6 +2,8 @@ const messages={
  scope:'Describe a visual style. Your current design is preserved.',
  auth:'Your sign-in needs refreshing. Open Account and sign in again, then retry.',
  auth_refreshed:'Your sign-in was refreshed. Try Restyle again.',
+ auth_rejected:'The server still could not verify your sign-in after a refresh attempt. Sign in again or check this deployment’s account configuration.',
+ access:'The site rejected this request before app sign-in could be verified. Reopen the page or check its deployment access settings.',
  callback:'Sign-in could not be completed. Start sign-in again in this browser.',
  setup:'Cerebras or account setup is incomplete. Your current design is preserved.',
  approval:'Owner approval or your own Cerebras key is required. Open Account to add your key.',

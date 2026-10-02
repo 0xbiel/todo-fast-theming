@@ -1,5 +1,5 @@
 import {createServer} from 'node:http';
-// Same-origin JSON endpoint. No CORS, cookies, redirects, credentials or body logs.
+// Same-origin JSON endpoint. No CORS, cookie-based app authentication, redirects, or credential/body logs.
 export function createApiHandler({service,snapshots,origin}) {
  const allowed=new URL(origin).origin;
  return async(req,res)=>{
@@ -11,7 +11,7 @@ export function createApiHandler({service,snapshots,origin}) {
    if(!['POST','PUT','DELETE'].includes(req.method)||(req.method==='POST'&&id)||(req.method!=='POST'&&!id))return reply(405,{error:'Invalid method.'});
    if(req.headers.origin!==allowed)return reply(403,{error:'Origin denied.'});
    const auth=req.headers.authorization;
-   if(typeof auth!=='string'||!/^Bearer [^\s]{1,8192}$/.test(auth))return reply(401,{error:'Sign in required.'});
+   if(typeof auth!=='string'||!/^Bearer [^\s]{1,8192}$/.test(auth))return reply(401,{code:'auth',error:'Sign in required.'});
    try{
     if(req.method==='DELETE'){await snapshots.revoke({token:auth.slice(7),id});return reply(200,{revoked:true})}
     if(req.headers['content-type']?.split(';')[0]!=='application/json'||req.headers['content-encoding'])return reply(415,{error:'JSON required.'});
@@ -25,7 +25,7 @@ export function createApiHandler({service,snapshots,origin}) {
   if(req.headers['content-type']?.split(';')[0]!=='application/json')return reply(415,{error:'JSON required.'});
   if(req.headers['content-encoding'])return reply(415,{error:'Encoding unsupported.'});
   const authorization=req.headers.authorization;
-  if(typeof authorization!=='string'||!/^Bearer [^\s]{1,8192}$/.test(authorization))return reply(401,{error:'Sign in required.'});
+  if(typeof authorization!=='string'||!/^Bearer [^\s]{1,8192}$/.test(authorization))return reply(401,{code:'auth',error:'Sign in required.'});
   try{
    const body=await readJson(req);
    if(!body||Array.isArray(body)||Object.keys(body).some(k=>!['prompt','byok'].includes(k)))return reply(400,{error:'Invalid request.'});
@@ -45,3 +45,4 @@ async function readJson(req){
  if(req.body!==undefined){const raw=typeof req.body==='string'?req.body:JSON.stringify(req.body);if(Buffer.byteLength(raw)>4096)throw Object.assign(Error(),{status:413});return JSON.parse(raw)}
  let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>4096)throw Object.assign(Error(),{status:413});chunks.push(chunk)}return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
+

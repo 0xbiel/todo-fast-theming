@@ -24,10 +24,10 @@ test('repair never launders URLs, dynamic functions, executable syntax or layout
  for(const value of ['background:url(https://evil.example)','background-color:var(--secret)','background-size:calc(100% - 1px)','display:none','position:fixed','pointer-events:none','opacity:0','transform:scale(0)','content:"spoof"','--secret:1','background-color:</style><script>','background-color:r\\65 d','@import "x"'])assert.throws(()=>repairVisualCss(value,'card'),value);
  assert.throws(()=>repairVisualCss('background-color:#ffffff;'.repeat(13)+'background:url(https://evil.example)','canvas'));
 });
-test('repair preserves strict schema and unsafe SVG rejection instead of altering geometry',()=>{
+test('repair preserves strict schema and omits unsafe optional SVG instead of altering geometry',()=>{
  const theme={...visualFixtures.notebook,visual:{...visualFixtures.notebook.visual,titleCss:'letter-spacing:-1px'}};
  assert.equal(validateTheme(repairVisualTheme(theme)).visual.titleCss,'letter-spacing:0px');
- for(const sceneSvg of ['<script/>','<svg viewBox="0 0 1000 1000"><rect fill="url(https://evil.example)"/></svg>','<svg viewBox="0 0 1000 1000"><rect width="9999"/></svg>'])assert.throws(()=>validateTheme(repairVisualTheme({...theme,visual:{...theme.visual,sceneSvg}})));
+ for(const sceneSvg of ['<script/>','<svg viewBox="0 0 1000 1000"><rect fill="url(https://evil.example)"/></svg>','<svg viewBox="0 0 1000 1000"><rect width="9999"/></svg>']){const candidate={...theme,visual:{...theme.visual,sceneSvg}};assert.throws(()=>validateTheme(candidate));assert.equal(validateTheme(repairVisualTheme(candidate)).visual.sceneSvg,'')}
  assert.throws(()=>repairVisualTheme({...theme,visual:{...theme.visual,script:'bad'}}));
  assert.throws(()=>validateTheme(repairVisualTheme({...theme,tasks:[]})));
 });

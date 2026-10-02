@@ -95,7 +95,7 @@ export function repairVisualCss(text,target){
  });
  return validateVisualCss(result,target);
 }
-export function repairVisualTheme(input){
+export function repairVisualTheme(input,{warnings}={}){
  if(input?.visual===undefined)return input;
  const visual=input.visual,keys=['canvasCss','cardCss','headingCss','titleCss','sceneSvg','cardSvg'];
  if(!visual||Array.isArray(visual)||Object.keys(visual).length!==keys.length||Object.keys(visual).some(key=>!keys.includes(key)))throw Error('Invalid visual design');
@@ -103,7 +103,15 @@ export function repairVisualTheme(input){
  for(const target of ['canvas','card','heading','title']){
   try{result[target+'Css']=repairVisualCss(visual[target+'Css'],target)}catch(error){throw Object.assign(error,{validationField:'visual.'+target+'Css'})}
  }
- // SVG and all other schema/geometry remain unchanged for strict validation.
+ // Decorations are optional. Never render or return a rejected SVG string.
+ for(const key of ['sceneSvg','cardSvg']){
+  if(typeof visual[key]!=='string')throw Object.assign(Error('Invalid visual design'),{validationField:'visual.'+key});
+  try{parseVisualSvg(visual[key])}catch{
+   result[key]='';
+   if(Array.isArray(warnings))warnings.push(key==='sceneSvg'?'scene_svg_removed':'card_svg_removed');
+  }
+ }
+ // Accepted SVG and the complete design still undergo strict final validation.
  return {...input,visual:result};
 }
 

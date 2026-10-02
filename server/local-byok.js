@@ -39,9 +39,9 @@ export function createLocalByokServer({origin='http://127.0.0.1:5173',ledger,gen
    await ledger.settle(reservation.id,0,!!excess);
    phase='output';if(result?.failure)throw new ProviderError(result.failure);
    if(excess||typeof result?.content!=='string'||result.content.length>262144)throw Error();
-   const theme=validateTheme(readableTheme(repairVisualTheme(decodeProviderTheme(JSON.parse(result.content)))));
+   const warnings=[];const theme=validateTheme(readableTheme(repairVisualTheme(decodeProviderTheme(JSON.parse(result.content)),{warnings})));
    if(JSON.stringify(theme).includes(key))throw Error();
-   return reply(200,{theme});
+   return reply(200,{theme,...(warnings.length?{warnings}:{})});
   }catch(error){
    if(reservation){try{if(dispatched)await ledger.settle(reservation.id,0);else await ledger.cancel(reservation.id)}catch{}}
    const code=error?.constructor?.name==='QuotaError'?'quota':error instanceof ProviderError?error.code:phase;

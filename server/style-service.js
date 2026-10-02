@@ -1,6 +1,6 @@
 import {validateStyleRequest,validateTheme} from '../src/theme.js';
 import {themeSchema} from '../src/theme-schema.js';
-import {QuotaError} from './ledger.js';
+import {QuotaError} from './errors.js';
 export const MAX_INPUT_TOKENS=4096,MAX_COMPLETION_TOKENS=2048;
 function cost(input,output,rates) {return Math.ceil((input*rates.inputMicrosPerMillion+output*rates.outputMicrosPerMillion)/1000000)}
 export function createStyleService({verifyIdToken,generate,ownerKey,approvedEmails=[],ledger,rates}) {
@@ -20,7 +20,7 @@ export function createStyleService({verifyIdToken,generate,ownerKey,approvedEmai
    if(!byok&&!approved.has(claims.email.toLowerCase()))return {status:403,error:'Owner approval or your own key is required.'};
    const key=byok||ownerKey;
    if(!key)return {status:503,error:'Provider setup required.'};
-   reservation=await ledger.reserve({uid:claims.uid,lane:byok?'byok':'shared',amount:byok?0:cost(MAX_INPUT_TOKENS,MAX_COMPLETION_TOKENS,rates)});
+   reservation=await ledger.reserve({uid:claims.uid,email:claims.email,lane:byok?'byok':'shared',amount:byok?0:cost(MAX_INPUT_TOKENS,MAX_COMPLETION_TOKENS,rates)});
    await ledger.dispatch(reservation.id);dispatched=true;
    const signal=AbortSignal.timeout(10000);
    let abortListener;
@@ -56,7 +56,7 @@ export async function readBoundedResponse(response,limit){
 // Explicitly enabled only by a separately configured live host. Never logs request bodies.
 export function createCerebrasAdapter(fetchImpl=fetch) {
  return async ({key,prompt,maxCompletionTokens,signal})=>{
-  const response=await fetchImpl('https://api.cerebras.ai/v1/chat/completions',{method:'POST',signal,headers:{'Content-Type':'application/json',Authorization:`Bearer ${key}`},body:JSON.stringify({model:'qwen-3.8-27b',reasoning_effort:'medium',reasoning_format:'parsed',max_completion_tokens:maxCompletionTokens,response_format:{type:'json_schema',json_schema:{name:'board_theme',strict:true,schema:themeSchema}},messages:[{role:'system',content:'Return ONLY a JSON presentation object with name (short style name), background/surface/text/muted/accent (#RRGGBB colors), radius (integer 0-24), font (sans or serif), density (compact or comfortable), layout (columns or stacked). Never return task content, code, HTML, URLs, explanations, or instructions. Only visual design is allowed.'},{role:'user',content:prompt}]})});
+  const response=await fetchImpl('https://api.cerebras.ai/v1/chat/completions',{method:'POST',signal,headers:{'Content-Type':'application/json',Authorization:`Bearer ${key}`},body:JSON.stringify({model:'qwen-3.8-27b',reasoning_effort:'medium',reasoning_format:'parsed',max_completion_tokens:maxCompletionTokens,response_format:{type:'json_schema',json_schema:{name:'board_theme',strict:true,schema:themeSchema}},messages:[{role:'system',content:'Return ONLY a JSON presentation object with name (short style name), background/surface/text/muted/accent/urgentColor (#RRGGBB colors; urgentColor must contrast at least 4.5:1 against surface), radius (integer 0-24), font (sans or serif), density (compact or comfortable), layout (columns or stacked). Never return task content, code, HTML, URLs, explanations, or instructions. Only visual design is allowed. You may create original gradient backgrounds and geometric SVG artwork via art: angle (0-360), start/end hex colors, shapes (0-8). Each shape has kind ellipse/rect/line; x/y/width/height 0-1000; rotation 0-360; fill/stroke hex; opacity 0-0.3. Text must have at least 4.5:1 contrast against surface and both gradient endpoints. Keep task surfaces readable. Decorative shapes must never cover controls.'},{role:'user',content:prompt}]})});
   if(!response.ok) throw Error('Provider unavailable');
   const text=await readBoundedResponse(response,32768);
   const data=JSON.parse(text);

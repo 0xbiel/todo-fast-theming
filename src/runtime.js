@@ -1,4 +1,5 @@
 import {createClient} from '@supabase/supabase-js';
+import {createHostedSnapshotClient} from './hosted-snapshots.js';
 import {createSupabaseAdapter} from './supabase-adapter.js';
 import {requestLocalStyle} from './local-style-client.js';
 import {requestStyle} from './style-client.js';
@@ -21,3 +22,6 @@ export async function generateStyle(prompt,current){
  const byok=localStorage.getItem('board-studio.byok')||undefined;
  return requestStyle({prompt,getIdToken:authentication.token,byok});
 }
+
+export const hostedSharing=env.VITE_ENABLE_PUBLIC_SHARING==='true';
+export const hostedSnapshots=createHostedSnapshotClient(()=>authentication?.token());

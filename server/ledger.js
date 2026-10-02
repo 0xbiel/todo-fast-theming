@@ -3,7 +3,8 @@ import {createHash,randomUUID} from 'node:crypto';
 import {mkdir} from 'node:fs/promises';
 import {dirname,isAbsolute} from 'node:path';
 import {fileURLToPath} from 'node:url';
-export class QuotaError extends Error {}
+import {QuotaError} from './errors.js';
+export {QuotaError} from './errors.js';
 export function createDurableLedger({path,clock=Date.now,limits={}}) {
  if(!isAbsolute(path)) throw Error('Absolute durable database path required');
  const settings={perMinute:5,perUserDaily:30,globalDaily:100,maxConcurrent:2,globalBudgetMicros:0,leaseMs:60000,...limits};

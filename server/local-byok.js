@@ -16,8 +16,10 @@ export function createLocalByokServer({origin='http://127.0.0.1:5173',ledger,gen
   if(req.url!=='/api/local-style'||req.method!=='POST')return reply(404,{error:'Not found.'});
   if(req.headers.origin!==origin)return reply(403,{error:'Origin denied.'});
   if(req.headers['content-type']?.split(';')[0]!=='application/json'||req.headers['content-encoding'])return reply(415,{error:'JSON required.'});
-  const token=req.headers.authorization?.replace(/^Bearer /,'')||'';
-  if(token.length!==capability.length||!timingSafeEqual(Buffer.from(token),Buffer.from(capability)))return reply(401,{error:'Local capability required.'});
+  const authorization=req.headers.authorization;
+  const token=typeof authorization==='string'&&authorization.startsWith('Bearer ')?authorization.slice(7):'';
+  const tokenBytes=Buffer.from(token),capabilityBytes=Buffer.from(capability);
+  if(tokenBytes.length!==capabilityBytes.length||!timingSafeEqual(tokenBytes,capabilityBytes))return reply(401,{error:'Local capability required.'});
   let reservation,dispatched=false;
   try{
    let bytes=0;const chunks=[];

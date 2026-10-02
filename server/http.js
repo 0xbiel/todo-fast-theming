@@ -1,10 +1,10 @@
 import {createServer} from 'node:http';
 // Same-origin JSON endpoint. No CORS, cookies, redirects, credentials or body logs.
-export function createApiServer({service,snapshots,origin}) {
+export function createApiHandler({service,snapshots,origin}) {
  const allowed=new URL(origin).origin;
- const server=createServer(async(req,res)=>{
+ return async(req,res)=>{
   const reply=(status,body)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(body))};
-  const snapshotMatch=/^\/api\/snapshots(?:\/([0-9a-f-]{36}))?$/.exec(req.url);
+  const snapshotMatch=/^\/api\/snapshots(?:\/([0-9a-f-]{36}))?$/.exec(req.url?.split('?')[0]);
   if(snapshotMatch&&snapshots){
    const id=snapshotMatch[1];
    if(req.method==='GET'&&id){try{const snapshot=await snapshots.read(id);return reply(snapshot?200:404,snapshot?{snapshot}:{error:'Unavailable.'})}catch{return reply(503,{error:'Unavailable.'})}}
@@ -15,12 +15,11 @@ export function createApiServer({service,snapshots,origin}) {
    try{
     if(req.method==='DELETE'){await snapshots.revoke({token:auth.slice(7),id});return reply(200,{revoked:true})}
     if(req.headers['content-type']?.split(';')[0]!=='application/json'||req.headers['content-encoding'])return reply(415,{error:'JSON required.'});
-    let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>4096){reply(413,{error:'Request too large.'});req.resume();return}chunks.push(chunk)}
-    const body=JSON.parse(Buffer.concat(chunks).toString('utf8'));if(!body||Object.keys(body).some(k=>k!=='theme'))return reply(400,{error:'Theme only.'});
+    const body=await readJson(req);if(!body||Object.keys(body).some(k=>k!=='theme'))return reply(400,{error:'Theme only.'});
     return reply(200,await snapshots.publish({token:auth.slice(7),theme:body.theme,id}));
-   }catch{return reply(403,{error:'Snapshot unavailable.'})}
+   }catch(error){return reply(error.status||403,{error:'Snapshot unavailable.'})}
   }
-  if(req.url!=='/api/style')return reply(404,{error:'Not found.'});
+  if(req.url?.split('?')[0]!=='/api/style')return reply(404,{error:'Not found.'});
   if(req.method!=='POST')return reply(405,{error:'POST required.'});
   if(req.headers.origin!==allowed)return reply(403,{error:'Origin denied.'});
   if(req.headers['content-type']?.split(';')[0]!=='application/json')return reply(415,{error:'JSON required.'});
@@ -28,14 +27,21 @@ export function createApiServer({service,snapshots,origin}) {
   const authorization=req.headers.authorization;
   if(typeof authorization!=='string'||!/^Bearer [^\s]{1,8192}$/.test(authorization))return reply(401,{error:'Sign in required.'});
   try{
-   let size=0;const chunks=[];
-   for await(const chunk of req){size+=chunk.length;if(size>4096){reply(413,{error:'Request too large.'});req.resume();return}chunks.push(chunk)}
-   const body=JSON.parse(Buffer.concat(chunks).toString('utf8'));
+   const body=await readJson(req);
    if(!body||Array.isArray(body)||Object.keys(body).some(k=>!['prompt','byok'].includes(k)))return reply(400,{error:'Invalid request.'});
    const result=await service({...body,token:authorization.slice(7)});
    const {status,...output}=result;reply(status,output);
-  }catch{if(!res.headersSent)reply(400,{error:'Invalid request.'})}
- });
+  }catch(error){if(!res.headersSent)reply(error.status||400,{error:'Invalid request.'})}
+ };
+}
+export function createApiServer(options){
+ const server=createServer(createApiHandler(options));
  server.requestTimeout=15000;server.headersTimeout=10000;server.maxHeadersCount=30;
  return server;
+}
+
+async function readJson(req){
+ if(Number(req.headers['content-length'])>4096)throw Object.assign(Error(),{status:413});
+ if(req.body!==undefined){const raw=typeof req.body==='string'?req.body:JSON.stringify(req.body);if(Buffer.byteLength(raw)>4096)throw Object.assign(Error(),{status:413});return JSON.parse(raw)}
+ let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>4096)throw Object.assign(Error(),{status:413});chunks.push(chunk)}return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }

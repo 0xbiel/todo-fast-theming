@@ -13,6 +13,7 @@ test('local BYOK requires loopback host, exact origin, capability and validated 
  const headers={Host:'127.0.0.1:5173',Origin:'http://127.0.0.1:5173','Content-Type':'application/json'};
  assert.equal((await fetch(url+'/api/local-session')).status,403);
  const {capability}=await(await fetch(url+'/api/local-session',{headers})).json();
+ assert.equal((await fetch(url+'/api/local-style',{method:'POST',headers:{...headers,Authorization:'Bearer '+ 'é'.repeat(64)},body:'{}'})).status,401);
  const body=JSON.stringify({prompt:'Make the board blue',byok:'test-key-only'});
  assert.equal((await fetch(url+'/api/local-style',{method:'POST',headers,body})).status,401);
  assert.equal((await fetch(url+'/api/local-style',{method:'POST',headers:{...headers,Origin:'https://evil.example',Authorization:'Bearer '+capability},body})).status,403);

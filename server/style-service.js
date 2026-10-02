@@ -58,8 +58,8 @@ export function createStyleService({verifyIdToken,generate,ownerKey,approvedEmai
   } catch(error) {
    if(!diagnostic&&['envelope_json','response_size','response_stream'].includes(error?.diagnosticStage))diagnostic={stage:error.diagnosticStage};
    if(reservation){try{if(dispatched)await ledger.settle(reservation.id);else await ledger.cancel(reservation.id)}catch{/* fail closed; reservation remains charged */}}
-   const code=error instanceof QuotaError?'quota':error instanceof ProviderError?error.code:phase==='request'?'scope':phase==='accounting'?'setup':phase==='provider'?(error?.name==='TimeoutError'||error?.message==='Timeout'?'network':'provider'):'output';
-   return {status:code==='quota'?429:code==='scope'?400:code==='setup'?503:502,code,error:'Style request unavailable. Your current style is preserved.',...(diagnostic&&Object.keys(diagnostic).length?{diagnostic}:{})};
+   const code=error instanceof QuotaError?(error.quotaCode==='safety_pause'?'safety_pause':'quota'):error instanceof ProviderError?error.code:phase==='request'?'scope':phase==='accounting'?'setup':phase==='provider'?(error?.name==='TimeoutError'||error?.message==='Timeout'?'network':'provider'):'output';
+   return {status:['quota','safety_pause'].includes(code)?429:code==='scope'?400:code==='setup'?503:502,code,error:'Style request unavailable. Your current style is preserved.',...(diagnostic&&Object.keys(diagnostic).length?{diagnostic}:{})};
   }
  };
 }

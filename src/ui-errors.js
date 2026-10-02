@@ -5,6 +5,7 @@ const messages={
  callback:'Sign-in could not be completed. Start sign-in again in this browser.',
  setup:'Cerebras or account setup is incomplete. Your current design is preserved.',
  approval:'Owner approval or your own Cerebras key is required. Open Account to add your key.',
+ safety_pause:'AI is paused by the accounting safety check. The owner needs to review it before more requests can run.',
  quota:'Request limit or shared budget reached. Wait for the rate limit or next UTC day.',
  key:'Enter a valid Cerebras key in Account.',
  provider_auth:'Cerebras rejected the API key or model access. Check your key in Account.',

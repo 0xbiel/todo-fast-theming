@@ -14,3 +14,11 @@ test('malformed provider envelope is explicitly labeled without response text',a
  const adapter=createCerebrasAdapter(async()=>new Response('private invalid body'));
  await assert.rejects(adapter({key:'fixture',prompt:'calm ocean',maxCompletionTokens:32768}),e=>e.diagnosticStage==='envelope_json'&&!e.message.includes('private'));
 });
+
+import {createSupabaseLedger} from '../server/supabase-ledger.js';
+import {responseError} from '../src/ui-errors.js';
+test('known accounting safety pause is distinguished from ordinary quota without echoing database text',async()=>{
+ const ledger=createSupabaseLedger({rpc:async()=>({error:{code:'P0001',message:'Quota unavailable'}})});
+ await assert.rejects(ledger.reserve({uid:'fixture',email:'fixture@example.com',lane:'shared',amount:52880}),e=>e.quotaCode==='safety_pause');
+ assert.match(responseError(429,'safety_pause').message,/accounting safety check/);
+});

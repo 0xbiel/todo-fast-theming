@@ -83,3 +83,5 @@ Local PostgreSQL tests run the actual migration using PGlite, including browser-
 Latest browser QA used a separate mock-only loopback preview: gradient/SVG decoration rendered, task editing remained usable, Urgent changed to the Rose theme color while retaining four bars, and the glass pill retained its styling. Actual provider output is still untested; local BYOK backend was restarted with the new schema without making an automatic request.
 
 Production honesty fix: Restyle fails with actionable setup messaging when live AI is disabled. No mock success or mocked theme is generated on hosted production. Random uses clearly labeled local presets in that state. Development mocking requires both Vite DEV mode and explicit VITE_ENABLE_MOCK=true.
+
+OAuth UI availability is explicit: set VITE_ENABLE_GOOGLE_AUTH=true or VITE_ENABLE_GITHUB_AUTH=true only after that Supabase provider is configured. Both default false; email magic-link can operate independently. Before sign-in the hosted badge says Sign-in required; Cerebras connected appears only after a validated provider result and is cleared on auth state changes.
